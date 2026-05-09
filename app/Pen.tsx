@@ -203,18 +203,18 @@ function SpriteTooltip({ pet }: { pet: PenPet }) {
 }
 
 function EmptyPen() {
+  // Uses a responsive container, NOT PenScaler — the empty-state message is
+  // just text + a CTA, no sprites to position. Scaling it down on mobile
+  // would shrink the copy and tap target to unreadable sizes.
   return (
-    <PenScaler>
-      <div
-        className="relative pixel-border flex items-center justify-center pixelated"
-        style={{
-          width: PEN_WIDTH,
-          height: PEN_HEIGHT,
-          backgroundImage: "url(/grass-texture.png)",
-          backgroundSize: "cover",
-          backgroundPosition: "center",
-        }}
-      >
+    <div
+      className="relative pixel-border mx-auto flex items-center justify-center pixelated w-full max-w-[900px] aspect-[9/5]"
+      style={{
+        backgroundImage: "url(/grass-texture.png)",
+        backgroundSize: "cover",
+        backgroundPosition: "center",
+      }}
+    >
       <div className="panel-parchment p-6 text-center max-w-sm">
         <div className="font-pixel text-base text-wood-dark mb-2">
           The pen is empty
@@ -229,8 +229,7 @@ function EmptyPen() {
           Start intake →
         </Link>
       </div>
-      </div>
-    </PenScaler>
+    </div>
   );
 }
 
