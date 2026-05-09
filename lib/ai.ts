@@ -9,6 +9,7 @@
 import { GoogleGenAI } from "@google/genai";
 import { getSupabaseAdmin } from "./supabase/admin";
 import { makeTransparentBg } from "./sprite";
+import { PREGENERATED_BREEDS, slugForBreed } from "./breed-sprites";
 import type { Behavioral, PetSex } from "./types";
 
 const SPRITE_MODEL = "gemini-2.5-flash-image";
@@ -65,14 +66,39 @@ async function _generateSprite(
   // AI work runs after the request lifecycle ends.
 }
 
+// Fast path: if the breed has a pregenerated sprite in storage, point the
+// pet's sprite_url at it directly. Returns true if used; false if the breed
+// isn't in the pregenerated set (caller should fall back to Gemini).
+async function tryUsePregeneratedBreedSprite(
+  petId: string,
+  breed: string
+): Promise<boolean> {
+  if (!PREGENERATED_BREEDS.has(breed)) return false;
+  const slug = slugForBreed(breed);
+  const admin = getSupabaseAdmin();
+  const path = `breeds/${slug}.png`;
+  const { data: pub } = admin.storage.from("sprites").getPublicUrl(path);
+  // Cache-bust per pet so the next page render picks up the URL change even
+  // though the underlying file is shared across all pets of this breed.
+  const versioned = `${pub.publicUrl}?v=${Date.now()}`;
+  const { error } = await admin
+    .from("pets")
+    .update({ sprite_url: versioned })
+    .eq("id", petId);
+  if (error) throw new Error(`Sprite DB update failed: ${error.message}`);
+  return true;
+}
+
 // Fire-and-forget wrapper used by the intake flow. Logs and swallows so a
 // failed generation never blocks the user — coordinator can regenerate later.
+// Tries the breed cache first; falls back to per-pet Gemini generation.
 export async function generateSprite(
   petId: string,
   species: string,
   breed: string
 ): Promise<void> {
   try {
+    if (await tryUsePregeneratedBreedSprite(petId, breed)) return;
     await _generateSprite(petId, species, breed);
   } catch (err) {
     console.error(`[ai] generateSprite failed for pet ${petId}:`, err);
