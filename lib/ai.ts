@@ -22,50 +22,53 @@ function getGenAI(): GoogleGenAI {
   return new GoogleGenAI({ apiKey });
 }
 
+async function _generateSprite(
+  petId: string,
+  species: string,
+  breed: string
+): Promise<void> {
+  const ai = getGenAI();
+  const subject = breed && breed !== "Mixed/Unknown" ? breed : species;
+  const prompt = `Create a cute low-res 8bit sprite side view of a ${subject}, no anti aliasing, square aspect ratio, transparent background, NES color palette`;
+
+  const buffer = await callImageModelWithRetry(ai, prompt);
+  if (!buffer) {
+    throw new Error("Image model returned no image data");
+  }
+
+  const admin = getSupabaseAdmin();
+  const filename = `${petId}.png`;
+  const { error: upErr } = await admin.storage
+    .from("sprites")
+    .upload(filename, buffer, {
+      contentType: "image/png",
+      upsert: true,
+    });
+  if (upErr) throw new Error(`Sprite upload failed: ${upErr.message}`);
+
+  const { data: pub } = admin.storage.from("sprites").getPublicUrl(filename);
+  const { error: updErr } = await admin
+    .from("pets")
+    .update({ sprite_url: pub.publicUrl })
+    .eq("id", petId);
+  if (updErr) throw new Error(`Sprite DB update failed: ${updErr.message}`);
+
+  revalidatePath(`/pets/${petId}`);
+  revalidatePath("/");
+  revalidatePath("/catalog");
+}
+
+// Fire-and-forget wrapper used by the intake flow. Logs and swallows so a
+// failed generation never blocks the user — coordinator can regenerate later.
 export async function generateSprite(
   petId: string,
   species: string,
   breed: string
 ): Promise<void> {
   try {
-    const ai = getGenAI();
-    const subject = breed && breed !== "Mixed/Unknown" ? breed : species;
-    const prompt = `Create a cute low-res 8bit sprite side view of a ${subject}, no anti aliasing, square aspect ratio, transparent background, NES color palette`;
-
-    const buffer = await callImageModelWithRetry(ai, prompt);
-    if (!buffer) {
-      console.error(`[ai] Sprite gen returned no image for pet ${petId}`);
-      return;
-    }
-
-    const admin = getSupabaseAdmin();
-    const filename = `${petId}.png`;
-    const { error: upErr } = await admin.storage
-      .from("sprites")
-      .upload(filename, buffer, {
-        contentType: "image/png",
-        upsert: true,
-      });
-    if (upErr) {
-      console.error(`[ai] Sprite upload failed for pet ${petId}:`, upErr.message);
-      return;
-    }
-
-    const { data: pub } = admin.storage.from("sprites").getPublicUrl(filename);
-    const { error: updErr } = await admin
-      .from("pets")
-      .update({ sprite_url: pub.publicUrl })
-      .eq("id", petId);
-    if (updErr) {
-      console.error(`[ai] Sprite DB update failed for pet ${petId}:`, updErr.message);
-      return;
-    }
-
-    revalidatePath(`/pets/${petId}`);
-    revalidatePath("/");
-    revalidatePath("/catalog");
+    await _generateSprite(petId, species, breed);
   } catch (err) {
-    console.error(`[ai] generateSprite threw for pet ${petId}:`, err);
+    console.error(`[ai] generateSprite failed for pet ${petId}:`, err);
   }
 }
 
@@ -96,7 +99,7 @@ async function callImageModelWithRetry(
   return null;
 }
 
-export async function generateBio(
+async function _generateBio(
   petId: string,
   details: {
     name: string;
@@ -106,10 +109,9 @@ export async function generateBio(
     behavioral: Behavioral;
   }
 ): Promise<void> {
-  try {
-    const ai = getGenAI();
-    const beh = details.behavioral;
-    const prompt = `You are writing a short, warm bio for a pet who will be temporarily fostered while their owner is in the hospital. Write 2-3 sentences in the pet's first-person voice. Keep it warm and inviting.
+  const ai = getGenAI();
+  const beh = details.behavioral;
+  const prompt = `You are writing a short, warm bio for a pet who will be temporarily fostered while their owner is in the hospital. Write 2-3 sentences in the pet's first-person voice. Keep it warm and inviting.
 
 Pet details:
 - Name: ${details.name}
@@ -126,25 +128,33 @@ Pet details:
 
 Output: 2-3 sentences in first person, no quote marks, no preamble. Just the bio.`;
 
-    const bio = await callTextModelWithRetry(ai, prompt);
-    if (!bio) {
-      console.error(`[ai] Bio gen returned no text for pet ${petId}`);
-      return;
-    }
+  const bio = await callTextModelWithRetry(ai, prompt);
+  if (!bio) throw new Error("Text model returned no text");
 
-    const admin = getSupabaseAdmin();
-    const { error } = await admin
-      .from("pets")
-      .update({ bio: bio.trim() })
-      .eq("id", petId);
-    if (error) {
-      console.error(`[ai] Bio DB update failed for pet ${petId}:`, error.message);
-      return;
-    }
+  const admin = getSupabaseAdmin();
+  const { error } = await admin
+    .from("pets")
+    .update({ bio: bio.trim() })
+    .eq("id", petId);
+  if (error) throw new Error(`Bio DB update failed: ${error.message}`);
 
-    revalidatePath(`/pets/${petId}`);
+  revalidatePath(`/pets/${petId}`);
+}
+
+export async function generateBio(
+  petId: string,
+  details: {
+    name: string;
+    breed: string;
+    age: number;
+    sex: PetSex;
+    behavioral: Behavioral;
+  }
+): Promise<void> {
+  try {
+    await _generateBio(petId, details);
   } catch (err) {
-    console.error(`[ai] generateBio threw for pet ${petId}:`, err);
+    console.error(`[ai] generateBio failed for pet ${petId}:`, err);
   }
 }
 
@@ -169,27 +179,31 @@ async function callTextModelWithRetry(
   return null;
 }
 
-// Coordinator regenerate triggers (called from coordinator actions if needed)
+// Coordinator regenerate triggers — these THROW on failure so the
+// coordinator action surfaces the real error to the admin (vs. fire-and-forget
+// intake which swallows so users aren't blocked).
 export async function regenerateSpriteForPet(petId: string): Promise<void> {
   const admin = getSupabaseAdmin();
-  const { data: pet } = await admin
+  const { data: pet, error } = await admin
     .from("pets")
     .select("species, breed")
     .eq("id", petId)
-    .single();
+    .maybeSingle();
+  if (error) throw new Error(`Pet lookup failed: ${error.message}`);
   if (!pet) throw new Error("Pet not found");
-  await generateSprite(petId, pet.species, pet.breed);
+  await _generateSprite(petId, pet.species, pet.breed);
 }
 
 export async function regenerateBioForPet(petId: string): Promise<void> {
   const admin = getSupabaseAdmin();
-  const { data: pet } = await admin
+  const { data: pet, error } = await admin
     .from("pets")
     .select("name, breed, age, sex, behavioral")
     .eq("id", petId)
-    .single();
+    .maybeSingle();
+  if (error) throw new Error(`Pet lookup failed: ${error.message}`);
   if (!pet) throw new Error("Pet not found");
-  await generateBio(petId, {
+  await _generateBio(petId, {
     name: pet.name,
     breed: pet.breed,
     age: pet.age,
