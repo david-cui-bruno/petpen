@@ -125,6 +125,44 @@ export async function listCatalogPets(): Promise<CatalogPet[]> {
     });
 }
 
+export interface PetProfileData {
+  pet: Pet;
+  stay: Stay | null;
+  photo_updates: import("./types").PhotoUpdate[];
+}
+
+export async function getPetWithStay(
+  id: string
+): Promise<PetProfileData | null> {
+  const admin = getSupabaseAdmin();
+  const { data: pet, error } = await admin
+    .from("pets")
+    .select("*")
+    .eq("id", id)
+    .single();
+  if (error || !pet) return null;
+
+  // Most recent stay for this pet (works whether or not it's terminal)
+  const { data: stays } = await admin
+    .from("stays")
+    .select("*")
+    .eq("pet_id", id)
+    .order("created_at", { ascending: false })
+    .limit(1);
+
+  const { data: updates } = await admin
+    .from("photo_updates")
+    .select("*")
+    .eq("pet_id", id)
+    .order("created_at", { ascending: false });
+
+  return {
+    pet: pet as Pet,
+    stay: (stays?.[0] as Stay | undefined) ?? null,
+    photo_updates: (updates ?? []) as import("./types").PhotoUpdate[],
+  };
+}
+
 export function deriveSize(
   weight: number | null
 ): "S" | "M" | "L" | "XL" | "unknown" {
