@@ -115,9 +115,12 @@ function PenSprite({
   const [highlighted, setHighlighted] = useState(initiallyHighlighted);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Drop the highlight after 5s. The query param stays in the URL but the
-  // visual stops; refresh re-arms it.
+  // Sync highlight state with the prop on every change — client-side nav to
+  // /?highlight=<other-id> keeps PenSprite mounted (keyed by pet.id stable
+  // across params), so useState(initiallyHighlighted) only runs once. Effect
+  // re-arms or clears as the prop flips.
   useEffect(() => {
+    setHighlighted(initiallyHighlighted);
     if (!initiallyHighlighted) return;
     const t = setTimeout(() => setHighlighted(false), 5000);
     return () => clearTimeout(t);
