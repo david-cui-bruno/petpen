@@ -7,7 +7,7 @@ import { daysUntil } from "@/lib/queries";
 
 const PEN_WIDTH = 900;
 const PEN_HEIGHT = 500;
-const SPRITE_SIZE = 48;
+const SPRITE_SIZE = 96;
 const PADDING = 40;
 
 const MIN_X = PADDING;
