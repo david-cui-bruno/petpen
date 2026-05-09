@@ -63,6 +63,34 @@ const supabase = createClient(SUPABASE_URL, SERVICE_KEY, {
 const ai = GOOGLE_API_KEY ? new GoogleGenAI({ apiKey: GOOGLE_API_KEY }) : null;
 
 // ---- sprite background removal (mirror of lib/sprite.ts) ----
+// Sample perimeter colors -> any color making up >=1% of perimeter is BG.
+// Then flood-fill from corners zeroing alpha on those colors.
+const PERIMETER_FREQ_THRESHOLD = 0.01;
+
+function collectBackgroundColors(buf, width, height) {
+  const counts = new Map();
+  const sample = (x, y) => {
+    const i = (y * width + x) * 4;
+    const key = `${buf[i]},${buf[i + 1]},${buf[i + 2]}`;
+    counts.set(key, (counts.get(key) ?? 0) + 1);
+  };
+  for (let x = 0; x < width; x++) {
+    sample(x, 0);
+    sample(x, height - 1);
+  }
+  for (let y = 1; y < height - 1; y++) {
+    sample(0, y);
+    sample(width - 1, y);
+  }
+  const perimeterPixels = 2 * width + 2 * (height - 2);
+  const minCount = Math.max(1, perimeterPixels * PERIMETER_FREQ_THRESHOLD);
+  const bg = new Set();
+  for (const [key, count] of counts) {
+    if (count >= minCount) bg.add(key);
+  }
+  return bg;
+}
+
 async function makeTransparentBg(input) {
   const img = sharp(input).ensureAlpha();
   const { data, info } = await img.raw().toBuffer({ resolveWithObject: true });
@@ -70,17 +98,13 @@ async function makeTransparentBg(input) {
   if (channels !== 4) throw new Error(`Expected RGBA, got ${channels}-channel`);
   const buf = Buffer.from(data);
 
-  const isBg = (idx) => {
-    const r = buf[idx], g = buf[idx + 1], b = buf[idx + 2];
-    if (r >= 235 && g >= 235 && b >= 235) return true;
-    if (
-      r >= 180 && r <= 230 &&
-      g >= 180 && g <= 230 &&
-      b >= 180 && b <= 230 &&
-      Math.abs(r - g) < 12 && Math.abs(g - b) < 12
-    ) return true;
-    return false;
-  };
+  const bgColors = collectBackgroundColors(buf, width, height);
+  if (bgColors.size === 0) {
+    return sharp(buf, { raw: { width, height, channels: 4 } }).png().toBuffer();
+  }
+
+  const isBg = (p) =>
+    bgColors.has(`${buf[p]},${buf[p + 1]},${buf[p + 2]}`);
 
   const visited = new Uint8Array(width * height);
   const stack = [
