@@ -3,7 +3,12 @@ import { listPenPets } from "@/lib/queries";
 
 export const dynamic = "force-dynamic";
 
-export default async function HomePage() {
+export default async function HomePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ highlight?: string }>;
+}) {
+  const sp = await searchParams;
   const pets = await listPenPets();
 
   return (
@@ -15,7 +20,7 @@ export default async function HomePage() {
         </p>
       </header>
 
-      <Pen pets={pets} />
+      <Pen pets={pets} highlightId={sp.highlight} />
 
       <footer className="max-w-4xl mx-auto mt-6 text-center text-xl">
         <a className="underline" href="/intake">
