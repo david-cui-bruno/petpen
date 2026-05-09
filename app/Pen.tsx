@@ -26,10 +26,15 @@ export function Pen({ pets }: PenProps) {
 
   return (
     <div
-      className="relative pixel-border bg-grass overflow-hidden mx-auto"
-      style={{ width: PEN_WIDTH, height: PEN_HEIGHT }}
+      className="relative pixel-border overflow-hidden mx-auto pixelated"
+      style={{
+        width: PEN_WIDTH,
+        height: PEN_HEIGHT,
+        backgroundImage: "url(/grass-texture.png)",
+        backgroundSize: "cover",
+        backgroundPosition: "center",
+      }}
     >
-      <FenceTufts />
       {pets.map((pet, i) => (
         <PenSprite key={pet.id} pet={pet} seed={i} />
       ))}
@@ -149,8 +154,14 @@ function SpriteTooltip({ pet }: { pet: PenPet }) {
 function EmptyPen() {
   return (
     <div
-      className="relative pixel-border bg-grass mx-auto flex items-center justify-center"
-      style={{ width: PEN_WIDTH, height: PEN_HEIGHT }}
+      className="relative pixel-border mx-auto flex items-center justify-center pixelated"
+      style={{
+        width: PEN_WIDTH,
+        height: PEN_HEIGHT,
+        backgroundImage: "url(/grass-texture.png)",
+        backgroundSize: "cover",
+        backgroundPosition: "center",
+      }}
     >
       <div className="panel-parchment p-6 text-center max-w-sm">
         <div className="font-pixel text-base text-wood-dark mb-2">
@@ -167,28 +178,6 @@ function EmptyPen() {
         </Link>
       </div>
     </div>
-  );
-}
-
-function FenceTufts() {
-  // Tiny decorative grass tufts so the pen feels alive even when nobody's home
-  const tufts = Array.from({ length: 14 }, (_, i) => ({
-    x: ((i * 73) % (PEN_WIDTH - 80)) + 40,
-    y: ((i * 41) % (PEN_HEIGHT - 80)) + 40,
-  }));
-  return (
-    <>
-      {tufts.map((t, i) => (
-        <div
-          key={i}
-          className="absolute text-base text-grass-dark select-none pointer-events-none"
-          style={{ left: t.x, top: t.y }}
-          aria-hidden
-        >
-          🌿
-        </div>
-      ))}
-    </>
   );
 }
 
