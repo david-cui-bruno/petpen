@@ -95,7 +95,9 @@ export async function postUpdate(petId: string, formData: FormData): Promise<voi
     throw new Error("Photo must be jpg, png, or webp");
   }
 
-  // Verify the pet exists before uploading; avoids leaking storage objects.
+  // Verify the pet exists AND has an active (non-terminal) stay before
+  // uploading; avoids leaking storage objects and prevents new public content
+  // on already-discharged or hidden pets.
   const { data: pet, error: petErr } = await admin
     .from("pets")
     .select("id")
@@ -103,6 +105,17 @@ export async function postUpdate(petId: string, formData: FormData): Promise<voi
     .maybeSingle();
   if (petErr) throw new Error(`Pet lookup failed: ${petErr.message}`);
   if (!pet) throw new Error("Pet not found");
+
+  const { data: activeStays, error: stayErr } = await admin
+    .from("stays")
+    .select("id")
+    .eq("pet_id", petId)
+    .not("status", "in", "(discharged,hidden)")
+    .limit(1);
+  if (stayErr) throw new Error(`Stay lookup failed: ${stayErr.message}`);
+  if (!activeStays || activeStays.length === 0) {
+    throw new Error("This pet's stay is closed; updates are no longer accepted");
+  }
 
   const buffer = Buffer.from(await photoFile.arrayBuffer());
   const resized = await resizeAndStripExif(buffer);
