@@ -1,5 +1,6 @@
 import { submitIntake } from "./actions";
 import { ALL_BREEDS } from "@/lib/breeds";
+import { CollapsibleSection } from "./CollapsibleSection";
 
 export const metadata = { title: "Intake — petpen" };
 
@@ -189,30 +190,6 @@ function Section({
       <h2 className="font-pixel text-base text-wood-dark">{title}</h2>
       {children}
     </section>
-  );
-}
-
-// Native browser <details>/<summary> accordion. No JS, no hydration cost.
-// Closed by default; keyboard-accessible (focusable summary, Enter/Space to
-// toggle). The "▸" rotates to "▾" on open via CSS pseudo-element below.
-function CollapsibleSection({
-  title,
-  children,
-}: {
-  title: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <details className="panel-parchment group">
-      <summary className="font-pixel text-base text-wood-dark cursor-pointer p-4 list-none flex items-center gap-2">
-        <span className="inline-block transition-transform group-open:rotate-90">
-          ▸
-        </span>
-        <span>{title}</span>
-        <span className="ml-auto text-base text-wood font-body">(optional)</span>
-      </summary>
-      <div className="px-4 pb-4 space-y-3">{children}</div>
-    </details>
   );
 }
 
