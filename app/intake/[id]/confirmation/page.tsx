@@ -58,7 +58,7 @@ export default async function ConfirmationPage({
           <CopyButton url={profileUrl} />
         </div>
         <Link
-          href={`/pets/${pet.id}`}
+          href={`/?highlight=${pet.id}`}
           className="inline-block font-pixel text-sm bg-grass text-parchment px-4 py-2 pixel-border hover:bg-grass-dark"
         >
           See {pet.name} in the pen →

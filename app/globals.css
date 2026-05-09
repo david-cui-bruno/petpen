@@ -52,3 +52,30 @@ body {
   background-color: var(--color-parchment);
   border: 4px solid var(--color-wood-dark);
 }
+
+/* Highlight effect for pet sprites — used when the pen is opened from an
+   intake confirmation link. Pulses a chunky yellow halo + tiny bounce. */
+@keyframes pet-highlight-pulse {
+  0%,
+  100% {
+    filter: drop-shadow(0 0 0 rgba(255, 213, 79, 0));
+    transform: scale(1);
+  }
+  50% {
+    filter: drop-shadow(0 0 12px rgba(255, 213, 79, 0.95))
+      drop-shadow(0 0 24px rgba(255, 213, 79, 0.7));
+    transform: scale(1.18);
+  }
+}
+
+.pet-highlight {
+  /* The Link element already has a `transform: translate(...)` applied for
+     positioning, so we layer the pulse via filter (which doesn't conflict)
+     plus an outline ring. The animation overlays scale on top of the
+     translate via `transform` — modern browsers compose them on the same
+     property, so the bounce briefly overrides the position by ~18%. That's
+     fine for 5 seconds; the pet snaps back when the highlight ends. */
+  animation: pet-highlight-pulse 0.7s ease-in-out infinite;
+  outline: 4px solid #ffd54f;
+  outline-offset: 2px;
+}

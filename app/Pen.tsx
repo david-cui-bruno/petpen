@@ -22,9 +22,10 @@ function clamp(v: number, min: number, max: number): number {
 
 interface PenProps {
   pets: PenPet[];
+  highlightId?: string;
 }
 
-export function Pen({ pets }: PenProps) {
+export function Pen({ pets, highlightId }: PenProps) {
   if (pets.length === 0) {
     return <EmptyPen />;
   }
@@ -41,7 +42,12 @@ export function Pen({ pets }: PenProps) {
         }}
       >
         {pets.map((pet, i) => (
-          <PenSprite key={pet.id} pet={pet} seed={i} />
+          <PenSprite
+            key={pet.id}
+            pet={pet}
+            seed={i}
+            initiallyHighlighted={pet.id === highlightId}
+          />
         ))}
       </div>
     </PenScaler>
@@ -93,12 +99,39 @@ function PenScaler({ children }: { children: React.ReactNode }) {
   );
 }
 
-function PenSprite({ pet, seed }: { pet: PenPet; seed: number }) {
+function PenSprite({
+  pet,
+  seed,
+  initiallyHighlighted = false,
+}: {
+  pet: PenPet;
+  seed: number;
+  initiallyHighlighted?: boolean;
+}) {
   const home = useMemo(() => deterministicPosition(pet.id, seed), [pet.id, seed]);
   const transitionMs = useMemo(() => deterministicTransition(pet.id), [pet.id]);
   const [pos, setPos] = useState(home);
   const [hovered, setHovered] = useState(false);
+  const [highlighted, setHighlighted] = useState(initiallyHighlighted);
+  // React's official "reset state from prop" pattern (setting state during
+  // render, conditional). Required because client-side nav to a different
+  // /?highlight=... keeps the keyed PenSprite mounted, so `useState(...)`
+  // only runs on first mount.
+  const [prevInitialHighlight, setPrevInitialHighlight] = useState(
+    initiallyHighlighted
+  );
+  if (prevInitialHighlight !== initiallyHighlighted) {
+    setPrevInitialHighlight(initiallyHighlighted);
+    setHighlighted(initiallyHighlighted);
+  }
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Schedule the 5s clear whenever we transition into the highlighted state.
+  useEffect(() => {
+    if (!highlighted) return;
+    const t = setTimeout(() => setHighlighted(false), 5000);
+    return () => clearTimeout(t);
+  }, [highlighted]);
 
   useEffect(() => {
     function tick() {
@@ -125,22 +158,29 @@ function PenSprite({ pet, seed }: { pet: PenPet; seed: number }) {
       style={{
         transform: `translate(${pos.x}px, ${pos.y}px)`,
         transition: `transform ${transitionMs}ms linear`,
-        zIndex: Math.round(pos.y),
+        zIndex: highlighted ? 9999 : Math.round(pos.y),
         width: SPRITE_SIZE,
         height: SPRITE_SIZE,
       }}
     >
-      <Sprite pet={pet} />
-      {fostered && (
-        <span
-          aria-hidden
-          className="absolute -top-1 -right-1 text-base"
-          title={`fostered by ${pet.stay?.foster_first_name ?? "someone"}`}
-        >
-          🏠
-        </span>
-      )}
-      {hovered && <SpriteTooltip pet={pet} />}
+      {/* Inner wrapper holds the pulse animation. Highlight CSS animates
+          transform: scale() on this child so it doesn't fight the Link's
+          inline transform: translate() that places the sprite in the pen. */}
+      <div
+        className={`relative w-full h-full ${highlighted ? "pet-highlight" : ""}`}
+      >
+        <Sprite pet={pet} />
+        {fostered && (
+          <span
+            aria-hidden
+            className="absolute -top-1 -right-1 text-base"
+            title={`fostered by ${pet.stay?.foster_first_name ?? "someone"}`}
+          >
+            🏠
+          </span>
+        )}
+      </div>
+      {(hovered || highlighted) && <SpriteTooltip pet={pet} />}
     </Link>
   );
 }
