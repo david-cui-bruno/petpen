@@ -73,7 +73,7 @@ function PenScaler({ children }: { children: React.ReactNode }) {
   return (
     <div
       ref={wrapperRef}
-      className="mx-auto"
+      className="mx-auto overflow-hidden"
       style={{
         width: "min(900px, 100%)",
         height: PEN_HEIGHT * scale,
