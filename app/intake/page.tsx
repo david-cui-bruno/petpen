@@ -2,6 +2,10 @@ import { submitIntake } from "./actions";
 
 export const metadata = { title: "Intake — petpen" };
 
+// Force runtime rendering — the form's default expected-return date is computed
+// from `new Date()`, so static prerendering would freeze it at build time.
+export const dynamic = "force-dynamic";
+
 function addDays(d: Date, days: number): Date {
   const out = new Date(d);
   out.setDate(out.getDate() + days);
