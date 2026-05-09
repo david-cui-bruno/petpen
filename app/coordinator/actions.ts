@@ -5,6 +5,7 @@ import { cookies } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { COORDINATOR_COOKIE, requireCoordinator } from "@/lib/coordinator";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
+import { regenerateBioForPet, regenerateSpriteForPet } from "@/lib/ai";
 
 export async function unlockCoordinator(formData: FormData): Promise<void> {
   const pin = String(formData.get("pin") ?? "").trim();
@@ -106,4 +107,14 @@ export async function updatePetBio(
     .eq("id", petId);
   if (error) throw new Error(`Bio update failed: ${error.message}`);
   revalidatePath(`/pets/${petId}`);
+}
+
+export async function regenerateSprite(petId: string): Promise<void> {
+  await requireCoordinator();
+  await regenerateSpriteForPet(petId);
+}
+
+export async function regenerateBio(petId: string): Promise<void> {
+  await requireCoordinator();
+  await regenerateBioForPet(petId);
 }
