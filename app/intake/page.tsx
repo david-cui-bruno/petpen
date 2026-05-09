@@ -1,4 +1,5 @@
 import { submitIntake } from "./actions";
+import { ALL_BREEDS } from "@/lib/breeds";
 
 export const metadata = { title: "Intake — petpen" };
 
@@ -29,7 +30,17 @@ export default function IntakePage() {
         Fill this out to bring your pet into the pen while you&apos;re away.
       </p>
 
-      <form action={submitIntake} className="space-y-6">
+      {/* Single shared breed list — native datalist filters by substring as the
+          user types, so dog breeds + cat breeds in one list works for both
+          species without any client-side toggling. */}
+      <datalist id="breed-options">
+        {ALL_BREEDS.map((breed) => (
+          <option key={breed} value={breed} />
+        ))}
+      </datalist>
+
+      <form action={submitIntake} className="space-y-4">
+        {/* Always open: required identification */}
         <Section title="🐾 About your pet">
           <Field label="Name" name="name" required />
           <SelectField
@@ -42,7 +53,13 @@ export default function IntakePage() {
               { value: "other", label: "Other" },
             ]}
           />
-          <Field label="Breed" name="breed" required />
+          <Field
+            label="Breed (start typing for suggestions)"
+            name="breed"
+            required
+            list="breed-options"
+            autoComplete="off"
+          />
           <Field label="Age (years)" name="age" type="number" min={0} required />
           <SelectField
             label="Sex"
@@ -53,7 +70,6 @@ export default function IntakePage() {
               { value: "male", label: "Male" },
             ]}
           />
-          <Field label="Color / markings" name="color_markings" />
           <Field label="Weight (lbs)" name="weight" type="number" min={0} />
           <FileField
             label="Photo (jpg, png, webp — max 5MB)"
@@ -83,16 +99,17 @@ export default function IntakePage() {
           />
         </Section>
 
-        <Section title="📅 Stay">
+        {/* Collapsed by default: optional sections */}
+        <CollapsibleSection title="📅 Stay">
           <Field
             label="Expected return date"
             name="expected_return"
             type="date"
             defaultValue={fourteenDaysFromNow}
           />
-        </Section>
+        </CollapsibleSection>
 
-        <Section title="💊 Medical">
+        <CollapsibleSection title="💊 Medical">
           <CheckboxField label="Vaccinated" name="med_vaccinated" />
           <TextareaField
             label="Medications (name + dose + frequency)"
@@ -102,9 +119,9 @@ export default function IntakePage() {
           <Field label="Vet name" name="med_vet_name" />
           <Field label="Vet phone" name="med_vet_phone" type="tel" />
           <TextareaField label="Special diet" name="med_diet" />
-        </Section>
+        </CollapsibleSection>
 
-        <Section title="🐕 Behavioral">
+        <CollapsibleSection title="🐕 Behavioral">
           <CheckboxField label="House-trained" name="beh_house_trained" />
           <CheckboxField label="Crate-trained" name="beh_crate_trained" />
           <CheckboxField label="Good with dogs" name="beh_good_with_dogs" />
@@ -122,9 +139,9 @@ export default function IntakePage() {
             name="beh_personality"
             placeholder="cuddly, mischievous, shy at first..."
           />
-        </Section>
+        </CollapsibleSection>
 
-        <Section title="📦 Logistics">
+        <CollapsibleSection title="📦 Logistics">
           <fieldset>
             <legend className="text-xl mb-1">Supplies provided:</legend>
             <div className="flex flex-wrap gap-3">
@@ -147,7 +164,7 @@ export default function IntakePage() {
             type="number"
             min={0}
           />
-        </Section>
+        </CollapsibleSection>
 
         <button
           type="submit"
@@ -175,6 +192,30 @@ function Section({
   );
 }
 
+// Native browser <details>/<summary> accordion. No JS, no hydration cost.
+// Closed by default; keyboard-accessible (focusable summary, Enter/Space to
+// toggle). The "▸" rotates to "▾" on open via CSS pseudo-element below.
+function CollapsibleSection({
+  title,
+  children,
+}: {
+  title: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <details className="panel-parchment group">
+      <summary className="font-pixel text-base text-wood-dark cursor-pointer p-4 list-none flex items-center gap-2">
+        <span className="inline-block transition-transform group-open:rotate-90">
+          ▸
+        </span>
+        <span>{title}</span>
+        <span className="ml-auto text-base text-wood font-body">(optional)</span>
+      </summary>
+      <div className="px-4 pb-4 space-y-3">{children}</div>
+    </details>
+  );
+}
+
 function Field({
   label,
   name,
@@ -182,6 +223,8 @@ function Field({
   required = false,
   min,
   defaultValue,
+  list,
+  autoComplete,
 }: {
   label: string;
   name: string;
@@ -189,6 +232,8 @@ function Field({
   required?: boolean;
   min?: number;
   defaultValue?: string;
+  list?: string;
+  autoComplete?: string;
 }) {
   return (
     <label className="block">
@@ -202,6 +247,8 @@ function Field({
         required={required}
         min={min}
         defaultValue={defaultValue}
+        list={list}
+        autoComplete={autoComplete}
         className="block w-full mt-1 px-2 py-1 bg-white text-wood-dark border-2 border-wood-dark"
       />
     </label>
