@@ -9,11 +9,16 @@ const PEN_WIDTH = 900;
 const PEN_HEIGHT = 500;
 const SPRITE_SIZE = 96;
 const PADDING = 40;
+const ROAM_RADIUS = 120;
 
 const MIN_X = PADDING;
 const MAX_X = PEN_WIDTH - PADDING - SPRITE_SIZE;
 const MIN_Y = PADDING;
 const MAX_Y = PEN_HEIGHT - PADDING - SPRITE_SIZE;
+
+function clamp(v: number, min: number, max: number): number {
+  return Math.max(min, Math.min(max, v));
+}
 
 interface PenProps {
   pets: PenPet[];
@@ -43,9 +48,9 @@ export function Pen({ pets }: PenProps) {
 }
 
 function PenSprite({ pet, seed }: { pet: PenPet; seed: number }) {
-  const initial = useMemo(() => deterministicPosition(pet.id, seed), [pet.id, seed]);
+  const home = useMemo(() => deterministicPosition(pet.id, seed), [pet.id, seed]);
   const transitionMs = useMemo(() => deterministicTransition(pet.id), [pet.id]);
-  const [pos, setPos] = useState(initial);
+  const [pos, setPos] = useState(home);
   const [hovered, setHovered] = useState(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -53,7 +58,7 @@ function PenSprite({ pet, seed }: { pet: PenPet; seed: number }) {
     function tick() {
       const idleMs = 4000 + Math.random() * 8000;
       timerRef.current = setTimeout(() => {
-        setPos(randomPosition());
+        setPos(roamFromHome(home));
         tick();
       }, idleMs);
     }
@@ -61,7 +66,7 @@ function PenSprite({ pet, seed }: { pet: PenPet; seed: number }) {
     return () => {
       if (timerRef.current) clearTimeout(timerRef.current);
     };
-  }, []);
+  }, [home.x, home.y]);
 
   const fostered = pet.stay?.status === "claimed" || pet.stay?.status === "fostered";
 
@@ -181,10 +186,14 @@ function EmptyPen() {
   );
 }
 
-function randomPosition() {
+function roamFromHome(home: { x: number; y: number }) {
+  // Pick a point inside a disc of radius ROAM_RADIUS around home, then clamp
+  // back inside the pen so a pet near a wall doesn't try to glide off-screen.
+  const angle = Math.random() * Math.PI * 2;
+  const dist = Math.random() * ROAM_RADIUS;
   return {
-    x: MIN_X + Math.random() * (MAX_X - MIN_X),
-    y: MIN_Y + Math.random() * (MAX_Y - MIN_Y),
+    x: clamp(home.x + Math.cos(angle) * dist, MIN_X, MAX_X),
+    y: clamp(home.y + Math.sin(angle) * dist, MIN_Y, MAX_Y),
   };
 }
 
