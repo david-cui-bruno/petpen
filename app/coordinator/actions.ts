@@ -15,9 +15,10 @@ export async function unlockCoordinator(formData: FormData): Promise<void> {
   }
   const jar = await cookies();
   jar.set(COORDINATOR_COOKIE, pin, {
-    httpOnly: false, // client also reads it for UI hints
+    httpOnly: true,
     sameSite: "lax",
     path: "/",
+    secure: process.env.NODE_ENV === "production",
     // 24h session
     maxAge: 60 * 60 * 24,
   });

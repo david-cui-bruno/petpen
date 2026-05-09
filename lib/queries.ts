@@ -143,6 +143,15 @@ export interface CoordinatorRow {
   owner_phone: string;
 }
 
+const VALID_STAY_STATUSES: ReadonlyArray<import("./types").StayStatus> = [
+  "intook",
+  "available",
+  "claimed",
+  "fostered",
+  "discharged",
+  "hidden",
+];
+
 export async function listCoordinatorRows(
   filterStatus?: string
 ): Promise<CoordinatorRow[]> {
@@ -165,7 +174,11 @@ export async function listCoordinatorRows(
     `
     )
     .order("intook_at", { ascending: false });
-  if (filterStatus && filterStatus !== "all") {
+  if (
+    filterStatus &&
+    filterStatus !== "all" &&
+    (VALID_STAY_STATUSES as ReadonlyArray<string>).includes(filterStatus)
+  ) {
     q = q.eq("status", filterStatus);
   }
   const { data, error } = await q;
