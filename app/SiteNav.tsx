@@ -20,6 +20,14 @@ export function SiteNav() {
       <Link href="/intake" className="text-xl hover:text-grass-light">
         Intake
       </Link>
+      <Link
+        href="/coordinator"
+        className="text-xl hover:text-grass-light"
+        title="Coordinator (PIN required)"
+        aria-label="Coordinator"
+      >
+        🔒
+      </Link>
     </nav>
   );
 }
