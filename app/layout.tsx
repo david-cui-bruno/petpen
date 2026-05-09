@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { VT323, Press_Start_2P } from "next/font/google";
 import "./globals.css";
+import { CoordinatorBanner } from "./CoordinatorBanner";
 
 const vt323 = VT323({
   weight: "400",
@@ -34,6 +35,7 @@ export default function RootLayout({
       className={`${vt323.variable} ${pressStart.variable} h-full`}
     >
       <body className="min-h-full flex flex-col font-body bg-parchment text-wood-dark">
+        <CoordinatorBanner />
         {children}
         {modal}
       </body>

@@ -126,6 +126,78 @@ export async function listCatalogPets(): Promise<CatalogPet[]> {
     });
 }
 
+export interface CoordinatorRow {
+  stay_id: string;
+  pet_id: string;
+  pet_name: string;
+  species: string;
+  breed: string;
+  status: import("./types").StayStatus;
+  intook_at: string;
+  expected_return: string;
+  actual_return: string | null;
+  foster_first_name: string | null;
+  foster_phone: string | null;
+  foster_commitment: import("./types").FosterCommitment | null;
+  owner_first_name: string;
+  owner_phone: string;
+}
+
+export async function listCoordinatorRows(
+  filterStatus?: string
+): Promise<CoordinatorRow[]> {
+  const admin = getSupabaseAdmin();
+  let q = admin
+    .from("stays")
+    .select(
+      `
+      id,
+      status,
+      intook_at,
+      expected_return,
+      actual_return,
+      foster_first_name,
+      foster_phone,
+      foster_commitment,
+      owner_first_name,
+      owner_phone,
+      pet:pets ( id, name, species, breed )
+    `
+    )
+    .order("intook_at", { ascending: false });
+  if (filterStatus && filterStatus !== "all") {
+    q = q.eq("status", filterStatus);
+  }
+  const { data, error } = await q;
+  if (error) throw new Error(`listCoordinatorRows failed: ${error.message}`);
+  return (data ?? [])
+    .filter((row) => row.pet)
+    .map((row) => {
+      const pet = row.pet as unknown as {
+        id: string;
+        name: string;
+        species: string;
+        breed: string;
+      };
+      return {
+        stay_id: row.id,
+        pet_id: pet.id,
+        pet_name: pet.name,
+        species: pet.species,
+        breed: pet.breed,
+        status: row.status,
+        intook_at: row.intook_at,
+        expected_return: row.expected_return,
+        actual_return: row.actual_return,
+        foster_first_name: row.foster_first_name,
+        foster_phone: row.foster_phone,
+        foster_commitment: row.foster_commitment,
+        owner_first_name: row.owner_first_name,
+        owner_phone: row.owner_phone,
+      };
+    });
+}
+
 export interface PetProfileData {
   pet: Pet;
   stay: Stay | null;
