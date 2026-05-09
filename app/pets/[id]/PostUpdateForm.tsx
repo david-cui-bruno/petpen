@@ -36,7 +36,6 @@ export function PostUpdateForm({ petId }: { petId: string }) {
     <form
       ref={formRef}
       action={handleAction}
-      encType="multipart/form-data"
       className="panel-parchment p-4 space-y-3 max-w-md"
     >
       <h3 className="font-pixel text-xs text-wood-dark">Post a photo update</h3>

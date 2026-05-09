@@ -7,7 +7,6 @@
 // field null so a coordinator can regenerate later.
 
 import { GoogleGenAI } from "@google/genai";
-import { revalidatePath } from "next/cache";
 import { getSupabaseAdmin } from "./supabase/admin";
 import type { Behavioral, PetSex } from "./types";
 
@@ -53,9 +52,9 @@ async function _generateSprite(
     .eq("id", petId);
   if (updErr) throw new Error(`Sprite DB update failed: ${updErr.message}`);
 
-  revalidatePath(`/pets/${petId}`);
-  revalidatePath("/");
-  revalidatePath("/catalog");
+  // Pages are force-dynamic so the next request fetches fresh; no revalidation
+  // needed. Calling revalidatePath here actually errors because fire-and-forget
+  // AI work runs after the request lifecycle ends.
 }
 
 // Fire-and-forget wrapper used by the intake flow. Logs and swallows so a
@@ -137,8 +136,6 @@ Output: 2-3 sentences in first person, no quote marks, no preamble. Just the bio
     .update({ bio: bio.trim() })
     .eq("id", petId);
   if (error) throw new Error(`Bio DB update failed: ${error.message}`);
-
-  revalidatePath(`/pets/${petId}`);
 }
 
 export async function generateBio(
