@@ -28,21 +28,67 @@ export function Pen({ pets }: PenProps) {
   if (pets.length === 0) {
     return <EmptyPen />;
   }
+  return (
+    <PenScaler>
+      <div
+        className="relative isolate pixel-border overflow-hidden pixelated"
+        style={{
+          width: PEN_WIDTH,
+          height: PEN_HEIGHT,
+          backgroundImage: "url(/grass-texture.png)",
+          backgroundSize: "cover",
+          backgroundPosition: "center",
+        }}
+      >
+        {pets.map((pet, i) => (
+          <PenSprite key={pet.id} pet={pet} seed={i} />
+        ))}
+      </div>
+    </PenScaler>
+  );
+}
+
+// Wraps the fixed 900x500 pen in a responsive container. On viewports narrower
+// than the pen's native width, the inner pen is shrunk via CSS transform so
+// the pen layout/coords stay 900x500 (no JS math changes); only the visual
+// size changes. Wrapper holds the post-scale width/height for layout flow.
+function PenScaler({ children }: { children: React.ReactNode }) {
+  const wrapperRef = useRef<HTMLDivElement>(null);
+  const [scale, setScale] = useState(1);
+
+  useEffect(() => {
+    const wrapper = wrapperRef.current;
+    if (!wrapper) return;
+    const update = () => {
+      const w = wrapper.clientWidth;
+      const next = Math.min(1, w / PEN_WIDTH);
+      setScale(next > 0 ? next : 1);
+    };
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(wrapper);
+    return () => observer.disconnect();
+  }, []);
 
   return (
     <div
-      className="relative isolate pixel-border overflow-hidden mx-auto pixelated"
+      ref={wrapperRef}
+      className="mx-auto overflow-hidden"
       style={{
-        width: PEN_WIDTH,
-        height: PEN_HEIGHT,
-        backgroundImage: "url(/grass-texture.png)",
-        backgroundSize: "cover",
-        backgroundPosition: "center",
+        width: "min(900px, 100%)",
+        height: PEN_HEIGHT * scale,
       }}
     >
-      {pets.map((pet, i) => (
-        <PenSprite key={pet.id} pet={pet} seed={i} />
-      ))}
+      <div
+        style={{
+          width: PEN_WIDTH,
+          height: PEN_HEIGHT,
+          transform: `scale(${scale})`,
+          transformOrigin: "top left",
+        }}
+      >
+        {children}
+      </div>
     </div>
   );
 }
@@ -157,12 +203,13 @@ function SpriteTooltip({ pet }: { pet: PenPet }) {
 }
 
 function EmptyPen() {
+  // Uses a responsive container, NOT PenScaler — the empty-state message is
+  // just text + a CTA, no sprites to position. Scaling it down on mobile
+  // would shrink the copy and tap target to unreadable sizes.
   return (
     <div
-      className="relative pixel-border mx-auto flex items-center justify-center pixelated"
+      className="relative pixel-border mx-auto flex items-center justify-center pixelated w-full max-w-[900px] aspect-[9/5]"
       style={{
-        width: PEN_WIDTH,
-        height: PEN_HEIGHT,
         backgroundImage: "url(/grass-texture.png)",
         backgroundSize: "cover",
         backgroundPosition: "center",
