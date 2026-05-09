@@ -389,3 +389,45 @@ COORDINATOR_PIN=
 - Badge derivation mapping (might want to tweak which form values trigger which badges)
 - Catalog card size (eyeball)
 - Whether modal-with-shareable-URL pattern feels right or we fall back to plain navigation
+
+# Mobile addendum
+
+The original spec deferred mobile work — `/`, `/intake`, `/coordinator` either hid features or rendered awkwardly on phones. This addendum closes the gap.
+
+## Goal
+
+Every existing feature works acceptably on a 360px-wide mobile viewport. No new features. No mobile-first redesign — desktop UX stays unchanged.
+
+## Out of scope
+
+- Dedicated mobile-only views or routes
+- Touch gestures beyond tap (no swipe / pinch / drag)
+- Native app
+- Landscape-specific tweaks (works either orientation, not optimized for one)
+- PWA / installable web app
+
+## Changes
+
+### 1. Pen on mobile
+- Currently: pen is hidden below `lg:` (1024px). Replaced with a "view on desktop" message.
+- After: pen renders at every viewport. Visual size scales with the container; the underlying coordinate system stays 900x500 so all positioning / roaming math is unchanged.
+- Implementation: wrap `<Pen />` in a fixed-aspect-ratio wrapper that's `min(900px, 100vw - 1rem)` wide. Inner pen stays 900x500 absolute; `transform: scale(N)` brings it to the wrapper's actual width. JS uses ResizeObserver to read the wrapper's measured width and recompute the scale factor.
+- Tooltip stays hover-only (mobile users tap, navigate, see info on the profile).
+- Touch targets: sprites scale down with the pen; on a 360px viewport sprites end up ~38px which is below the 44px iOS recommended minimum. Acceptable for v1; if it's annoying in practice, add transparent click-padding around each sprite.
+
+### 2. Coordinator dashboard on mobile
+- Currently: horizontal-scroll table. Functional but cramped.
+- After: render the same data as a stacked card list below `lg:`; table stays on `lg:` and up.
+- Each card shows: pet name + breed + species, status pill, intook + return dates, owner first name + phone, foster info if claimed, action buttons (Discharge / Release claim / Hide).
+
+### 3. Nav polish on mobile
+- Currently: nav items wrap onto a second line on narrow viewports.
+- After: nav fits one line at 360px. Drop `Pen` / `Catalog` / `Intake` text size from `text-xl` to `text-base` on mobile; keep the petpen logo and 🔒 lock icon at full size.
+
+## PRs
+
+**PR M1 — Mobile-friendly pen.** Remove `lg:` gating, add the responsive wrapper + scale calculation. ~80 lines.
+
+**PR M2 — Coordinator dashboard mobile cards.** Add a card list under `lg:hidden`; gate the existing table behind `hidden lg:block`. Both render the same data. ~80 lines.
+
+**PR M3 — Nav size polish.** Tailwind breakpoint tweaks on `app/SiteNav.tsx`. ~10 lines.

@@ -15,19 +15,7 @@ export default async function HomePage() {
         </p>
       </header>
 
-      <div className="hidden lg:block">
-        <Pen pets={pets} />
-      </div>
-
-      <div className="lg:hidden panel-parchment p-4 max-w-sm mx-auto text-center">
-        <h2 className="font-pixel text-base text-wood-dark mb-2">
-          View on desktop
-        </h2>
-        <p className="text-xl">
-          The pen is best on a bigger screen. Browse the catalog or open a pet&apos;s
-          profile from your bookmark instead.
-        </p>
-      </div>
+      <Pen pets={pets} />
 
       <footer className="max-w-4xl mx-auto mt-6 text-center text-xl">
         <a className="underline" href="/intake">
