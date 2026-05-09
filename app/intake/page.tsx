@@ -2,12 +2,21 @@ import { submitIntake } from "./actions";
 
 export const metadata = { title: "Intake — petpen" };
 
+function addDays(d: Date, days: number): Date {
+  const out = new Date(d);
+  out.setDate(out.getDate() + days);
+  return out;
+}
+
+function localDateString(d: Date): string {
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
+}
+
 export default function IntakePage() {
-  const fourteenDaysFromNow = new Date(
-    Date.now() + 14 * 24 * 60 * 60 * 1000
-  )
-    .toISOString()
-    .slice(0, 10);
+  const fourteenDaysFromNow = localDateString(addDays(new Date(), 14));
 
   return (
     <main className="flex-1 max-w-3xl mx-auto p-6">

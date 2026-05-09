@@ -28,6 +28,19 @@ function asBool(v: FormDataEntryValue | null): boolean {
   return v === "on" || v === "true";
 }
 
+function addDays(d: Date, days: number): Date {
+  const out = new Date(d);
+  out.setDate(out.getDate() + days);
+  return out;
+}
+
+function localDateString(d: Date): string {
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
+}
+
 export async function submitIntake(formData: FormData): Promise<void> {
   const admin = getSupabaseAdmin();
 
@@ -79,10 +92,7 @@ export async function submitIntake(formData: FormData): Promise<void> {
   }
 
   const expectedReturnRaw = asString(formData.get("expected_return"));
-  const fourteenDaysFromNow = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000);
-  const expectedReturn = expectedReturnRaw
-    ? expectedReturnRaw
-    : fourteenDaysFromNow.toISOString().slice(0, 10);
+  const expectedReturn = expectedReturnRaw || localDateString(addDays(new Date(), 14));
 
   // ---- Medical / behavioral / logistics ----
   const medical: Medical = {
@@ -149,6 +159,10 @@ export async function submitIntake(formData: FormData): Promise<void> {
   }
 
   // ---- Insert stay ----
+  // Best-effort atomicity: if stay insert fails, clean up the pet row and uploaded
+  // photo so the user can retry without leaving orphans. Not a true transaction —
+  // a hard crash mid-cleanup can still orphan the photo, but this covers the
+  // common (transient DB error) case.
   const { error: stayErr } = await admin.from("stays").insert({
     pet_id: pet.id,
     owner_first_name: ownerFirstName,
@@ -163,6 +177,8 @@ export async function submitIntake(formData: FormData): Promise<void> {
     status: "available",
   });
   if (stayErr) {
+    await admin.from("pets").delete().eq("id", pet.id);
+    await admin.storage.from("photos").remove([photoFilename]);
     throw new Error(`Stay insert failed: ${stayErr.message}`);
   }
 
