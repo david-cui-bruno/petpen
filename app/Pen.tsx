@@ -113,18 +113,25 @@ function PenSprite({
   const [pos, setPos] = useState(home);
   const [hovered, setHovered] = useState(false);
   const [highlighted, setHighlighted] = useState(initiallyHighlighted);
+  // React's official "reset state from prop" pattern (setting state during
+  // render, conditional). Required because client-side nav to a different
+  // /?highlight=... keeps the keyed PenSprite mounted, so `useState(...)`
+  // only runs on first mount.
+  const [prevInitialHighlight, setPrevInitialHighlight] = useState(
+    initiallyHighlighted
+  );
+  if (prevInitialHighlight !== initiallyHighlighted) {
+    setPrevInitialHighlight(initiallyHighlighted);
+    setHighlighted(initiallyHighlighted);
+  }
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Sync highlight state with the prop on every change — client-side nav to
-  // /?highlight=<other-id> keeps PenSprite mounted (keyed by pet.id stable
-  // across params), so useState(initiallyHighlighted) only runs once. Effect
-  // re-arms or clears as the prop flips.
+  // Schedule the 5s clear whenever we transition into the highlighted state.
   useEffect(() => {
-    setHighlighted(initiallyHighlighted);
-    if (!initiallyHighlighted) return;
+    if (!highlighted) return;
     const t = setTimeout(() => setHighlighted(false), 5000);
     return () => clearTimeout(t);
-  }, [initiallyHighlighted]);
+  }, [highlighted]);
 
   useEffect(() => {
     function tick() {
