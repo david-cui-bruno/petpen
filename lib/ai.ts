@@ -8,6 +8,7 @@
 
 import { GoogleGenAI } from "@google/genai";
 import { getSupabaseAdmin } from "./supabase/admin";
+import { makeTransparentBg } from "./sprite";
 import type { Behavioral, PetSex } from "./types";
 
 const SPRITE_MODEL = "gemini-2.5-flash-image";
@@ -30,10 +31,13 @@ async function _generateSprite(
   const subject = breed && breed !== "Mixed/Unknown" ? breed : species;
   const prompt = `Create a cute low-res 8bit sprite side view of a ${subject}, no anti aliasing, square aspect ratio, transparent background, NES color palette`;
 
-  const buffer = await callImageModelWithRetry(ai, prompt);
-  if (!buffer) {
+  const raw = await callImageModelWithRetry(ai, prompt);
+  if (!raw) {
     throw new Error("Image model returned no image data");
   }
+
+  // Knock out the fake "transparent" checkerboard Gemini paints in.
+  const buffer = await makeTransparentBg(raw);
 
   const admin = getSupabaseAdmin();
   const filename = `${petId}.png`;

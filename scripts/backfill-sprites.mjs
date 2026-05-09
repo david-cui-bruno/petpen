@@ -1,14 +1,27 @@
-// One-off backfill script for sprite generation. Runs through every pet whose
-// sprite_url is NULL and re-tries the AI generation. Safe to re-run.
+// Sprite backfill / reprocess script.
 //
-// Usage: node scripts/backfill-sprites.mjs
+// Default mode: regenerate sprites for any pet whose sprite_url is null
+//   (used after a quota error or for new pets that missed the intake-time gen).
+// --reprocess mode: download every existing sprite, knock out fake-transparent
+//   checkerboard backgrounds via flood fill, re-upload. Doesn't call the AI
+//   model — useful after a sprite-pipeline change.
+// --pet <id> targets a single pet by ID (works with both modes).
 //
-// Reads .env.local for Supabase + Google credentials. Skips pets that already
-// have a sprite_url. Logs each pet as it processes.
+// Usage:
+//   node scripts/backfill-sprites.mjs
+//   node scripts/backfill-sprites.mjs --reprocess
+//   node scripts/backfill-sprites.mjs --reprocess --pet <uuid>
 
 import { readFileSync } from "node:fs";
 import { createClient } from "@supabase/supabase-js";
 import { GoogleGenAI } from "@google/genai";
+import sharp from "sharp";
+
+// ---- arg parsing ----
+const args = process.argv.slice(2);
+const REPROCESS = args.includes("--reprocess");
+const petArgIdx = args.indexOf("--pet");
+const PET_ID = petArgIdx >= 0 ? args[petArgIdx + 1] : null;
 
 // ---- load .env.local ----
 function loadEnvLocal() {
@@ -35,20 +48,67 @@ const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const GOOGLE_API_KEY = process.env.GOOGLE_API_KEY;
 
-if (!SUPABASE_URL || !SERVICE_KEY || !GOOGLE_API_KEY) {
-  console.error("Missing env vars. Need NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, GOOGLE_API_KEY.");
+if (!SUPABASE_URL || !SERVICE_KEY) {
+  console.error("Missing NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY");
+  process.exit(1);
+}
+if (!REPROCESS && !GOOGLE_API_KEY) {
+  console.error("Missing GOOGLE_API_KEY (needed for generation; not needed for --reprocess)");
   process.exit(1);
 }
 
 const supabase = createClient(SUPABASE_URL, SERVICE_KEY, {
   auth: { autoRefreshToken: false, persistSession: false },
 });
-const ai = new GoogleGenAI({ apiKey: GOOGLE_API_KEY });
+const ai = GOOGLE_API_KEY ? new GoogleGenAI({ apiKey: GOOGLE_API_KEY }) : null;
+
+// ---- sprite background removal (mirror of lib/sprite.ts) ----
+async function makeTransparentBg(input) {
+  const img = sharp(input).ensureAlpha();
+  const { data, info } = await img.raw().toBuffer({ resolveWithObject: true });
+  const { width, height, channels } = info;
+  if (channels !== 4) throw new Error(`Expected RGBA, got ${channels}-channel`);
+  const buf = Buffer.from(data);
+
+  const isBg = (idx) => {
+    const r = buf[idx], g = buf[idx + 1], b = buf[idx + 2];
+    if (r >= 235 && g >= 235 && b >= 235) return true;
+    if (
+      r >= 180 && r <= 230 &&
+      g >= 180 && g <= 230 &&
+      b >= 180 && b <= 230 &&
+      Math.abs(r - g) < 12 && Math.abs(g - b) < 12
+    ) return true;
+    return false;
+  };
+
+  const visited = new Uint8Array(width * height);
+  const stack = [
+    0,
+    width - 1,
+    (height - 1) * width,
+    (height - 1) * width + (width - 1),
+  ];
+  while (stack.length > 0) {
+    const idx = stack.pop();
+    if (visited[idx]) continue;
+    const p = idx * 4;
+    if (!isBg(p)) continue;
+    visited[idx] = 1;
+    buf[p + 3] = 0;
+    const x = idx % width;
+    const y = (idx - x) / width;
+    if (x > 0) stack.push(idx - 1);
+    if (x < width - 1) stack.push(idx + 1);
+    if (y > 0) stack.push(idx - width);
+    if (y < height - 1) stack.push(idx + width);
+  }
+  return sharp(buf, { raw: { width, height, channels: 4 } }).png().toBuffer();
+}
 
 async function generateSpriteBuffer(species, breed) {
   const subject = breed && breed !== "Mixed/Unknown" ? breed : species;
   const prompt = `Create a cute low-res 8bit sprite side view of a ${subject}, no anti aliasing, square aspect ratio, transparent background, NES color palette`;
-
   for (let attempt = 1; attempt <= 2; attempt++) {
     try {
       const response = await ai.models.generateContent({
@@ -68,36 +128,81 @@ async function generateSpriteBuffer(species, breed) {
   return null;
 }
 
-async function backfillPet(pet) {
+async function uploadAndUpdate(petId, processedBuffer) {
+  const filename = `${petId}.png`;
+  const { error: upErr } = await supabase.storage
+    .from("sprites")
+    .upload(filename, processedBuffer, {
+      contentType: "image/png",
+      upsert: true,
+    });
+  if (upErr) return `UPLOAD FAILED: ${upErr.message}`;
+  const { data: pub } = supabase.storage.from("sprites").getPublicUrl(filename);
+  // Bust client caches by appending a version param (Supabase Storage doesn't
+  // version, and the public URL is stable per filename).
+  const versioned = `${pub.publicUrl}?v=${Date.now()}`;
+  const { error: updErr } = await supabase
+    .from("pets")
+    .update({ sprite_url: versioned })
+    .eq("id", petId);
+  if (updErr) return `DB UPDATE FAILED: ${updErr.message}`;
+  return null;
+}
+
+async function backfillOne(pet) {
   process.stdout.write(`  ${pet.name} (${pet.breed})... `);
-  let buf;
+  let raw;
   try {
-    buf = await generateSpriteBuffer(pet.species, pet.breed);
+    raw = await generateSpriteBuffer(pet.species, pet.breed);
   } catch (err) {
     console.log(`MODEL ERROR: ${err.message ?? err}`);
     return false;
   }
-  if (!buf) {
+  if (!raw) {
     console.log("no image returned");
     return false;
   }
-
-  const filename = `${pet.id}.png`;
-  const { error: upErr } = await supabase.storage
-    .from("sprites")
-    .upload(filename, buf, { contentType: "image/png", upsert: true });
-  if (upErr) {
-    console.log(`UPLOAD FAILED: ${upErr.message}`);
+  let processed;
+  try {
+    processed = await makeTransparentBg(raw);
+  } catch (err) {
+    console.log(`PROCESS ERROR: ${err.message ?? err}`);
     return false;
   }
+  const failure = await uploadAndUpdate(pet.id, processed);
+  if (failure) {
+    console.log(failure);
+    return false;
+  }
+  console.log("✓");
+  return true;
+}
 
-  const { data: pub } = supabase.storage.from("sprites").getPublicUrl(filename);
-  const { error: updErr } = await supabase
-    .from("pets")
-    .update({ sprite_url: pub.publicUrl })
-    .eq("id", pet.id);
-  if (updErr) {
-    console.log(`DB UPDATE FAILED: ${updErr.message}`);
+async function reprocessOne(pet) {
+  process.stdout.write(`  ${pet.name} (${pet.breed})... `);
+  if (!pet.sprite_url) {
+    console.log("(no sprite to reprocess; skipping)");
+    return false;
+  }
+  let raw;
+  try {
+    const res = await fetch(pet.sprite_url);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    raw = Buffer.from(await res.arrayBuffer());
+  } catch (err) {
+    console.log(`DOWNLOAD ERROR: ${err.message ?? err}`);
+    return false;
+  }
+  let processed;
+  try {
+    processed = await makeTransparentBg(raw);
+  } catch (err) {
+    console.log(`PROCESS ERROR: ${err.message ?? err}`);
+    return false;
+  }
+  const failure = await uploadAndUpdate(pet.id, processed);
+  if (failure) {
+    console.log(failure);
     return false;
   }
   console.log("✓");
@@ -105,24 +210,29 @@ async function backfillPet(pet) {
 }
 
 async function main() {
-  const { data: pets, error } = await supabase
+  let query = supabase
     .from("pets")
-    .select("id, name, species, breed, sprite_url")
-    .is("sprite_url", null);
-
+    .select("id, name, species, breed, sprite_url");
+  if (PET_ID) {
+    query = query.eq("id", PET_ID);
+  } else if (!REPROCESS) {
+    query = query.is("sprite_url", null);
+  }
+  const { data: pets, error } = await query;
   if (error) {
     console.error("Query failed:", error.message);
     process.exit(1);
   }
   if (!pets || pets.length === 0) {
-    console.log("No pets need sprite backfill.");
+    console.log("No matching pets.");
     return;
   }
 
-  console.log(`Backfilling ${pets.length} sprite(s):`);
+  const mode = REPROCESS ? "Reprocessing" : "Generating";
+  console.log(`${mode} ${pets.length} sprite(s):`);
   let ok = 0;
   for (const pet of pets) {
-    const success = await backfillPet(pet);
+    const success = REPROCESS ? await reprocessOne(pet) : await backfillOne(pet);
     if (success) ok++;
   }
   console.log(`\nDone. ${ok}/${pets.length} succeeded.`);
