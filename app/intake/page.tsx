@@ -29,11 +29,7 @@ export default function IntakePage() {
         Fill this out to bring your pet into the pen while you&apos;re away.
       </p>
 
-      <form
-        action={submitIntake}
-        encType="multipart/form-data"
-        className="space-y-6"
-      >
+      <form action={submitIntake} className="space-y-6">
         <Section title="🐾 About your pet">
           <Field label="Name" name="name" required />
           <SelectField
