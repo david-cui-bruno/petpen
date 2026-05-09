@@ -16,10 +16,13 @@ export async function generateMetadata({
 
 export default async function PetProfilePage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ just_claimed?: string }>;
 }) {
   const { id } = await params;
+  const { just_claimed } = await searchParams;
   const data = await getPetWithStay(id);
 
   if (!data) {
@@ -44,7 +47,7 @@ export default async function PetProfilePage({
           ← back to the pen
         </Link>
       </div>
-      <PetProfile data={data} />
+      <PetProfile data={data} justClaimed={just_claimed === "1"} />
     </main>
   );
 }

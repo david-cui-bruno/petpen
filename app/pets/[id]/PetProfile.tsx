@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { daysUntil, type PetProfileData } from "@/lib/queries";
 import type { Badge } from "@/lib/types";
+import { ClaimForm } from "./ClaimForm";
+import { PostUpdateForm } from "./PostUpdateForm";
 
 const ENERGY_LABELS: Record<number, string> = {
   1: "Couch potato",
@@ -10,7 +12,13 @@ const ENERGY_LABELS: Record<number, string> = {
   5: "Zoomies",
 };
 
-export function PetProfile({ data }: { data: PetProfileData }) {
+export function PetProfile({
+  data,
+  justClaimed = false,
+}: {
+  data: PetProfileData;
+  justClaimed?: boolean;
+}) {
   const { pet, stay, photo_updates } = data;
   const fostered =
     stay?.status === "claimed" || stay?.status === "fostered";
@@ -20,14 +28,25 @@ export function PetProfile({ data }: { data: PetProfileData }) {
 
   return (
     <div className="space-y-6">
+      {justClaimed && (
+        <div className="panel-parchment p-3 text-center bg-grass-light">
+          <p className="font-pixel text-xs text-wood-dark">
+            Thanks for fostering! 🐾
+          </p>
+          <p className="text-xl mt-1">
+            Bookmark this page so you can post photo updates while {pet.name} is
+            with you.
+          </p>
+        </div>
+      )}
       <Header pet={pet} stay={stay} fostered={fostered} ownerLine={ownerLine} />
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <BioPanel bio={pet.bio} name={pet.name} />
         <BadgesPanel badges={pet.badges ?? []} />
       </div>
       <CareNotesPanel data={data} />
-      <FosterCTA stay={stay} fostered={fostered} />
-      <PhotoUpdatesPanel updates={photo_updates} />
+      <FosterCTA pet={pet} stay={stay} fostered={fostered} />
+      <PhotoUpdatesPanel petId={pet.id} updates={photo_updates} />
     </div>
   );
 }
@@ -195,9 +214,11 @@ function CareNotesPanel({ data }: { data: PetProfileData }) {
 }
 
 function FosterCTA({
+  pet,
   stay,
   fostered,
 }: {
+  pet: PetProfileData["pet"];
   stay: PetProfileData["stay"];
   fostered: boolean;
 }) {
@@ -216,36 +237,31 @@ function FosterCTA({
     return (
       <section className="panel-parchment p-4 text-center">
         <p className="font-pixel text-xs text-wood-dark">
-          🎉 {/* eslint-disable-next-line react/no-unescaped-entities */}Went home
+          🎉 Went home
         </p>
       </section>
     );
   }
   return (
     <section className="panel-parchment p-4 text-center">
-      <button
-        type="button"
-        disabled
-        title="Coming soon"
-        className="font-pixel text-sm bg-grass text-parchment px-6 py-3 pixel-border opacity-70 cursor-not-allowed"
-      >
-        Foster me — coming soon
-      </button>
-      <p className="text-base mt-2 italic text-wood">
-        Claim flow lands in the next PR.
-      </p>
+      <ClaimForm petId={pet.id} />
     </section>
   );
 }
 
 function PhotoUpdatesPanel({
+  petId,
   updates,
 }: {
+  petId: string;
   updates: PetProfileData["photo_updates"];
 }) {
   return (
     <section className="space-y-3">
-      <h2 className="font-pixel text-xs text-wood-dark">Photo updates</h2>
+      <div className="flex items-center justify-between">
+        <h2 className="font-pixel text-xs text-wood-dark">Photo updates</h2>
+        <PostUpdateForm petId={petId} />
+      </div>
       {updates.length === 0 ? (
         <p className="text-xl italic text-wood">
           No photo updates yet. Once a foster posts one, it shows up here.
