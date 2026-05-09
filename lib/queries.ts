@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { getSupabaseAdmin } from "./supabase/admin";
 import type { Behavioral, Pet, Stay } from "./types";
 
@@ -124,6 +125,52 @@ export async function listCatalogPets(): Promise<CatalogPet[]> {
       };
     });
 }
+
+export interface PetProfileData {
+  pet: Pet;
+  stay: Stay | null;
+  photo_updates: import("./types").PhotoUpdate[];
+}
+
+export const getPetWithStay = cache(
+  async (id: string): Promise<PetProfileData | null> => {
+    const admin = getSupabaseAdmin();
+    const { data: pet, error: petErr } = await admin
+      .from("pets")
+      .select("*")
+      .eq("id", id)
+      .maybeSingle();
+    if (petErr) {
+      throw new Error(`getPetWithStay (pet) failed: ${petErr.message}`);
+    }
+    if (!pet) return null;
+
+    const { data: stays, error: stayErr } = await admin
+      .from("stays")
+      .select("*")
+      .eq("pet_id", id)
+      .order("created_at", { ascending: false })
+      .limit(1);
+    if (stayErr) {
+      throw new Error(`getPetWithStay (stay) failed: ${stayErr.message}`);
+    }
+
+    const { data: updates, error: updErr } = await admin
+      .from("photo_updates")
+      .select("*")
+      .eq("pet_id", id)
+      .order("created_at", { ascending: false });
+    if (updErr) {
+      throw new Error(`getPetWithStay (updates) failed: ${updErr.message}`);
+    }
+
+    return {
+      pet: pet as Pet,
+      stay: (stays?.[0] as Stay | undefined) ?? null,
+      photo_updates: (updates ?? []) as import("./types").PhotoUpdate[],
+    };
+  }
+);
 
 export function deriveSize(
   weight: number | null
