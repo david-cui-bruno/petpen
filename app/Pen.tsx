@@ -144,7 +144,7 @@ function PenSprite({
       href={`/pets/${pet.id}`}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
-      className={`absolute block ${highlighted ? "pet-highlight" : ""}`}
+      className="absolute block"
       style={{
         transform: `translate(${pos.x}px, ${pos.y}px)`,
         transition: `transform ${transitionMs}ms linear`,
@@ -153,16 +153,23 @@ function PenSprite({
         height: SPRITE_SIZE,
       }}
     >
-      <Sprite pet={pet} />
-      {fostered && (
-        <span
-          aria-hidden
-          className="absolute -top-1 -right-1 text-base"
-          title={`fostered by ${pet.stay?.foster_first_name ?? "someone"}`}
-        >
-          🏠
-        </span>
-      )}
+      {/* Inner wrapper holds the pulse animation. Highlight CSS animates
+          transform: scale() on this child so it doesn't fight the Link's
+          inline transform: translate() that places the sprite in the pen. */}
+      <div
+        className={`relative w-full h-full ${highlighted ? "pet-highlight" : ""}`}
+      >
+        <Sprite pet={pet} />
+        {fostered && (
+          <span
+            aria-hidden
+            className="absolute -top-1 -right-1 text-base"
+            title={`fostered by ${pet.stay?.foster_first_name ?? "someone"}`}
+          >
+            🏠
+          </span>
+        )}
+      </div>
       {(hovered || highlighted) && <SpriteTooltip pet={pet} />}
     </Link>
   );
