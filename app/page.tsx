@@ -15,11 +15,11 @@ export default async function HomePage() {
         </p>
       </header>
 
-      <div className="hidden md:block">
+      <div className="hidden lg:block">
         <Pen pets={pets} />
       </div>
 
-      <div className="md:hidden panel-parchment p-4 max-w-sm mx-auto text-center">
+      <div className="lg:hidden panel-parchment p-4 max-w-sm mx-auto text-center">
         <h2 className="font-pixel text-base text-wood-dark mb-2">
           View on desktop
         </h2>

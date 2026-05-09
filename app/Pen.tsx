@@ -39,6 +39,7 @@ export function Pen({ pets }: PenProps) {
 
 function PenSprite({ pet, seed }: { pet: PenPet; seed: number }) {
   const initial = useMemo(() => deterministicPosition(pet.id, seed), [pet.id, seed]);
+  const transitionMs = useMemo(() => deterministicTransition(pet.id), [pet.id]);
   const [pos, setPos] = useState(initial);
   const [hovered, setHovered] = useState(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -57,7 +58,6 @@ function PenSprite({ pet, seed }: { pet: PenPet; seed: number }) {
     };
   }, []);
 
-  const transitionMs = 2000 + Math.random() * 2000;
   const fostered = pet.stay?.status === "claimed" || pet.stay?.status === "fostered";
 
   return (
@@ -208,4 +208,15 @@ function deterministicPosition(id: string, seed: number) {
   const x = MIN_X + (hash % (MAX_X - MIN_X));
   const y = MIN_Y + ((hash >>> 8) % (MAX_Y - MIN_Y));
   return { x, y };
+}
+
+// Stable glide duration per pet ID. Avoids server/client hydration mismatch
+// from Math.random() in render and keeps each pet's "personality" consistent.
+function deterministicTransition(id: string) {
+  let hash = 0;
+  for (let i = 0; i < id.length; i++) {
+    hash = (hash * 17 + id.charCodeAt(i)) >>> 0;
+  }
+  // 2000-4000ms range
+  return 2000 + (hash % 2000);
 }
