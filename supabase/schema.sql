@@ -58,7 +58,7 @@ create table if not exists stays (
   owner_emergency_contact   jsonb,
   owner_what_if_unable      text,
   intook_at                 timestamptz not null default now(),
-  expected_return           date not null,
+  expected_return           date not null default (current_date + interval '14 days')::date,
   actual_return             date,
   status                    stay_status not null default 'available',
   foster_first_name         text,
