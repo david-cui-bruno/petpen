@@ -148,11 +148,13 @@ export default function IntakePage() {
             <div className="flex flex-wrap gap-3">
               {(["food", "leash", "bed", "crate", "meds"] as const).map((s) => (
                 <label key={s} className="flex items-center gap-1 text-xl">
+                  {/* No defaultChecked — opening the section to peek shouldn't
+                      auto-claim "owner provided food/leash/bed/crate." Owners
+                      tick what they're actually bringing. */}
                   <input
                     type="checkbox"
                     name="logistics_supplies"
                     value={s}
-                    defaultChecked={s !== "meds"}
                   />
                   {s}
                 </label>
