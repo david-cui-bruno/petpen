@@ -20,6 +20,7 @@ import sharp from "sharp";
 // ---- arg parsing ----
 const args = process.argv.slice(2);
 const REPROCESS = args.includes("--reprocess");
+const ALL_FRESH = args.includes("--all-fresh");
 const petArgIdx = args.indexOf("--pet");
 const PET_ID = petArgIdx >= 0 ? args[petArgIdx + 1] : null;
 
@@ -148,7 +149,7 @@ async function makeTransparentBg(input) {
 
 async function generateSpriteBuffer(species, breed) {
   const subject = breed && breed !== "Mixed/Unknown" ? breed : species;
-  const prompt = `Create a cute low-res 8bit sprite side view of a ${subject}, no anti aliasing, square aspect ratio, transparent background, NES color palette`;
+  const prompt = `Create a cute low-res 8bit sprite side view of a ${subject}, no anti aliasing, square aspect ratio, solid lime green background, NES color palette`;
   for (let attempt = 1; attempt <= 2; attempt++) {
     try {
       const response = await ai.models.generateContent({
@@ -255,7 +256,7 @@ async function main() {
     .select("id, name, species, breed, sprite_url");
   if (PET_ID) {
     query = query.eq("id", PET_ID);
-  } else if (!REPROCESS) {
+  } else if (!REPROCESS && !ALL_FRESH) {
     query = query.is("sprite_url", null);
   }
   const { data: pets, error } = await query;

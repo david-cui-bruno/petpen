@@ -29,7 +29,11 @@ async function _generateSprite(
 ): Promise<void> {
   const ai = getGenAI();
   const subject = breed && breed !== "Mixed/Unknown" ? breed : species;
-  const prompt = `Create a cute low-res 8bit sprite side view of a ${subject}, no anti aliasing, square aspect ratio, transparent background, NES color palette`;
+  // Solid lime-green background instead of "transparent" — Gemini paints a
+  // checker pattern when asked for transparency. A flat bright green is
+  // unambiguous chroma-key fodder for the perimeter-sampling step in
+  // lib/sprite.ts. The subject is a dog or cat with no green in its palette.
+  const prompt = `Create a cute low-res 8bit sprite side view of a ${subject}, no anti aliasing, square aspect ratio, solid lime green background, NES color palette`;
 
   const raw = await callImageModelWithRetry(ai, prompt);
   if (!raw) {
