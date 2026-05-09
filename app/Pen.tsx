@@ -31,7 +31,7 @@ export function Pen({ pets }: PenProps) {
 
   return (
     <div
-      className="relative pixel-border overflow-hidden mx-auto pixelated"
+      className="relative isolate pixel-border overflow-hidden mx-auto pixelated"
       style={{
         width: PEN_WIDTH,
         height: PEN_HEIGHT,
