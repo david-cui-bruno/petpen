@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { VT323, Press_Start_2P } from "next/font/google";
 import "./globals.css";
 import { CoordinatorBanner } from "./CoordinatorBanner";
+import { SiteNav } from "./SiteNav";
 
 const vt323 = VT323({
   weight: "400",
@@ -36,6 +37,7 @@ export default function RootLayout({
     >
       <body className="min-h-full flex flex-col font-body bg-parchment text-wood-dark">
         <CoordinatorBanner />
+        <SiteNav />
         {children}
         {modal}
       </body>
