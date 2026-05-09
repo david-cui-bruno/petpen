@@ -1,4 +1,6 @@
 import { submitIntake } from "./actions";
+import { ALL_BREEDS } from "@/lib/breeds";
+import { CollapsibleSection } from "./CollapsibleSection";
 
 export const metadata = { title: "Intake — petpen" };
 
@@ -29,7 +31,17 @@ export default function IntakePage() {
         Fill this out to bring your pet into the pen while you&apos;re away.
       </p>
 
-      <form action={submitIntake} className="space-y-6">
+      {/* Single shared breed list — native datalist filters by substring as the
+          user types, so dog breeds + cat breeds in one list works for both
+          species without any client-side toggling. */}
+      <datalist id="breed-options">
+        {ALL_BREEDS.map((breed) => (
+          <option key={breed} value={breed} />
+        ))}
+      </datalist>
+
+      <form action={submitIntake} className="space-y-4">
+        {/* Always open: required identification */}
         <Section title="🐾 About your pet">
           <Field label="Name" name="name" required />
           <SelectField
@@ -42,7 +54,13 @@ export default function IntakePage() {
               { value: "other", label: "Other" },
             ]}
           />
-          <Field label="Breed" name="breed" required />
+          <Field
+            label="Breed (start typing for suggestions)"
+            name="breed"
+            required
+            list="breed-options"
+            autoComplete="off"
+          />
           <Field label="Age (years)" name="age" type="number" min={0} required />
           <SelectField
             label="Sex"
@@ -53,7 +71,6 @@ export default function IntakePage() {
               { value: "male", label: "Male" },
             ]}
           />
-          <Field label="Color / markings" name="color_markings" />
           <Field label="Weight (lbs)" name="weight" type="number" min={0} />
           <FileField
             label="Photo (jpg, png, webp — max 5MB)"
@@ -83,16 +100,17 @@ export default function IntakePage() {
           />
         </Section>
 
-        <Section title="📅 Stay">
+        {/* Collapsed by default: optional sections */}
+        <CollapsibleSection title="📅 Stay" name="stay">
           <Field
             label="Expected return date"
             name="expected_return"
             type="date"
             defaultValue={fourteenDaysFromNow}
           />
-        </Section>
+        </CollapsibleSection>
 
-        <Section title="💊 Medical">
+        <CollapsibleSection title="💊 Medical" name="medical">
           <CheckboxField label="Vaccinated" name="med_vaccinated" />
           <TextareaField
             label="Medications (name + dose + frequency)"
@@ -102,9 +120,9 @@ export default function IntakePage() {
           <Field label="Vet name" name="med_vet_name" />
           <Field label="Vet phone" name="med_vet_phone" type="tel" />
           <TextareaField label="Special diet" name="med_diet" />
-        </Section>
+        </CollapsibleSection>
 
-        <Section title="🐕 Behavioral">
+        <CollapsibleSection title="🐕 Behavioral" name="behavioral">
           <CheckboxField label="House-trained" name="beh_house_trained" />
           <CheckboxField label="Crate-trained" name="beh_crate_trained" />
           <CheckboxField label="Good with dogs" name="beh_good_with_dogs" />
@@ -122,19 +140,21 @@ export default function IntakePage() {
             name="beh_personality"
             placeholder="cuddly, mischievous, shy at first..."
           />
-        </Section>
+        </CollapsibleSection>
 
-        <Section title="📦 Logistics">
+        <CollapsibleSection title="📦 Logistics" name="logistics">
           <fieldset>
             <legend className="text-xl mb-1">Supplies provided:</legend>
             <div className="flex flex-wrap gap-3">
               {(["food", "leash", "bed", "crate", "meds"] as const).map((s) => (
                 <label key={s} className="flex items-center gap-1 text-xl">
+                  {/* No defaultChecked — opening the section to peek shouldn't
+                      auto-claim "owner provided food/leash/bed/crate." Owners
+                      tick what they're actually bringing. */}
                   <input
                     type="checkbox"
                     name="logistics_supplies"
                     value={s}
-                    defaultChecked={s !== "meds"}
                   />
                   {s}
                 </label>
@@ -147,7 +167,7 @@ export default function IntakePage() {
             type="number"
             min={0}
           />
-        </Section>
+        </CollapsibleSection>
 
         <button
           type="submit"
@@ -182,6 +202,8 @@ function Field({
   required = false,
   min,
   defaultValue,
+  list,
+  autoComplete,
 }: {
   label: string;
   name: string;
@@ -189,6 +211,8 @@ function Field({
   required?: boolean;
   min?: number;
   defaultValue?: string;
+  list?: string;
+  autoComplete?: string;
 }) {
   return (
     <label className="block">
@@ -202,6 +226,8 @@ function Field({
         required={required}
         min={min}
         defaultValue={defaultValue}
+        list={list}
+        autoComplete={autoComplete}
         className="block w-full mt-1 px-2 py-1 bg-white text-wood-dark border-2 border-wood-dark"
       />
     </label>

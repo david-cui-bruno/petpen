@@ -95,41 +95,61 @@ export async function submitIntake(formData: FormData): Promise<void> {
   const expectedReturn = expectedReturnRaw || localDateString(addDays(new Date(), 14));
 
   // ---- Medical / behavioral / logistics ----
-  const medical: Medical = {
-    vaccinated: asBool(formData.get("med_vaccinated")),
-    medications: asString(formData.get("med_medications")) || undefined,
-    allergies: asString(formData.get("med_allergies")) || undefined,
-    vet_name: asString(formData.get("med_vet_name")) || undefined,
-    vet_phone: asString(formData.get("med_vet_phone")) || undefined,
-    diet: asString(formData.get("med_diet")) || undefined,
-  };
+  // Each optional section emits a hidden _section_<name>_submitted marker
+  // when the user opened it. Without that marker, the section's inputs are
+  // disabled (don't submit), and we treat the section as "user skipped" by
+  // leaving its fields undefined rather than coercing missing-checkboxes
+  // to false. Empty object means "no opinion" downstream, so badges stay
+  // off and the bio prompt doesn't claim explicit "no" answers.
+  const medicalOpened = formData.get("_section_medical_submitted") === "1";
+  const behavioralOpened =
+    formData.get("_section_behavioral_submitted") === "1";
+  const logisticsOpened =
+    formData.get("_section_logistics_submitted") === "1";
 
-  const energyRaw = asInt(formData.get("beh_energy"));
-  const behavioral: Behavioral = {
-    house_trained: asBool(formData.get("beh_house_trained")),
-    crate_trained: asBool(formData.get("beh_crate_trained")),
-    good_with_dogs: asBool(formData.get("beh_good_with_dogs")),
-    good_with_cats: asBool(formData.get("beh_good_with_cats")),
-    good_with_kids: asBool(formData.get("beh_good_with_kids")),
-    energy: (energyRaw && energyRaw >= 1 && energyRaw <= 5
-      ? (energyRaw as 1 | 2 | 3 | 4 | 5)
-      : undefined),
-    personality_keywords:
-      asString(formData.get("beh_personality")) || undefined,
-  };
+  const medical: Medical = medicalOpened
+    ? {
+        vaccinated: asBool(formData.get("med_vaccinated")),
+        medications: asString(formData.get("med_medications")) || undefined,
+        allergies: asString(formData.get("med_allergies")) || undefined,
+        vet_name: asString(formData.get("med_vet_name")) || undefined,
+        vet_phone: asString(formData.get("med_vet_phone")) || undefined,
+        diet: asString(formData.get("med_diet")) || undefined,
+      }
+    : {};
 
-  const supplies = formData.getAll("logistics_supplies").map(asString) as (
-    | "food"
-    | "leash"
-    | "bed"
-    | "crate"
-    | "meds"
-  )[];
-  const logistics: Logistics = {
-    supplies,
-    vet_authorization_amount:
-      asInt(formData.get("logistics_vet_auth")) ?? undefined,
-  };
+  const behavioral: Behavioral = behavioralOpened
+    ? (() => {
+        const energyRaw = asInt(formData.get("beh_energy"));
+        return {
+          house_trained: asBool(formData.get("beh_house_trained")),
+          crate_trained: asBool(formData.get("beh_crate_trained")),
+          good_with_dogs: asBool(formData.get("beh_good_with_dogs")),
+          good_with_cats: asBool(formData.get("beh_good_with_cats")),
+          good_with_kids: asBool(formData.get("beh_good_with_kids")),
+          energy:
+            energyRaw && energyRaw >= 1 && energyRaw <= 5
+              ? (energyRaw as 1 | 2 | 3 | 4 | 5)
+              : undefined,
+          personality_keywords:
+            asString(formData.get("beh_personality")) || undefined,
+        };
+      })()
+    : {};
+
+  const logistics: Logistics = logisticsOpened
+    ? {
+        supplies: formData.getAll("logistics_supplies").map(asString) as (
+          | "food"
+          | "leash"
+          | "bed"
+          | "crate"
+          | "meds"
+        )[],
+        vet_authorization_amount:
+          asInt(formData.get("logistics_vet_auth")) ?? undefined,
+      }
+    : {};
 
   const badges = deriveBadges(behavioral, medical);
 

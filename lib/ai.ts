@@ -118,20 +118,36 @@ async function _generateBio(
 ): Promise<void> {
   const ai = getGenAI();
   const beh = details.behavioral;
+
+  // Only feed the AI behavioral fields the owner actually answered. `undefined`
+  // means the section was skipped at intake; we shouldn't pretend the owner
+  // said "no" to good-with-kids when they said nothing at all.
+  const knownBehaviorLines: string[] = [];
+  if (beh.energy) knownBehaviorLines.push(`- Energy level (1-5): ${beh.energy}`);
+  if (beh.good_with_kids !== undefined)
+    knownBehaviorLines.push(`- Good with kids: ${beh.good_with_kids ? "yes" : "no"}`);
+  if (beh.good_with_dogs !== undefined)
+    knownBehaviorLines.push(`- Good with dogs: ${beh.good_with_dogs ? "yes" : "no"}`);
+  if (beh.good_with_cats !== undefined)
+    knownBehaviorLines.push(`- Good with cats: ${beh.good_with_cats ? "yes" : "no"}`);
+  if (beh.house_trained !== undefined)
+    knownBehaviorLines.push(`- House-trained: ${beh.house_trained ? "yes" : "no"}`);
+  if (beh.crate_trained !== undefined)
+    knownBehaviorLines.push(`- Crate-trained: ${beh.crate_trained ? "yes" : "no"}`);
+  if (beh.personality_keywords)
+    knownBehaviorLines.push(`- Personality keywords from owner: ${beh.personality_keywords}`);
+
+  const behaviorBlock = knownBehaviorLines.length
+    ? "\n" + knownBehaviorLines.join("\n")
+    : "";
+
   const prompt = `You are writing a short, warm bio for a pet who will be temporarily fostered while their owner is in the hospital. Write 2-3 sentences in the pet's first-person voice. Keep it warm and inviting.
 
 Pet details:
 - Name: ${details.name}
 - Breed: ${details.breed}
 - Age: ${details.age}
-- Sex: ${details.sex}
-- Energy level (1-5): ${beh.energy ?? "unknown"}
-- Good with kids: ${beh.good_with_kids ? "yes" : "no"}
-- Good with dogs: ${beh.good_with_dogs ? "yes" : "no"}
-- Good with cats: ${beh.good_with_cats ? "yes" : "no"}
-- House-trained: ${beh.house_trained ? "yes" : "no"}
-- Crate-trained: ${beh.crate_trained ? "yes" : "no"}
-- Personality keywords from owner: ${beh.personality_keywords ?? "(none provided)"}
+- Sex: ${details.sex}${behaviorBlock}
 
 Output: 2-3 sentences in first person, no quote marks, no preamble. Just the bio.`;
 
