@@ -155,6 +155,7 @@ export async function submitIntake(formData: FormData): Promise<void> {
     .select("id, name, breed, species")
     .single();
   if (petErr || !pet) {
+    await admin.storage.from("photos").remove([photoFilename]);
     throw new Error(`Pet insert failed: ${petErr?.message ?? "unknown"}`);
   }
 
