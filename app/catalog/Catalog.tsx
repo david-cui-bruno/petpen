@@ -322,13 +322,17 @@ function filterAndSort(
     return true;
   });
 
-  // Default sort: unclaimed first (available), then by intake date newest first
+  // Default sort: unclaimed first (intook/available), then by intake date newest
   return filtered.sort((a, b) => {
-    const aAvailable = a.stay?.status === "available" ? 0 : 1;
-    const bAvailable = b.stay?.status === "available" ? 0 : 1;
-    if (aAvailable !== bAvailable) return aAvailable - bAvailable;
+    const aUnclaimed = isUnclaimed(a.stay?.status) ? 0 : 1;
+    const bUnclaimed = isUnclaimed(b.stay?.status) ? 0 : 1;
+    if (aUnclaimed !== bUnclaimed) return aUnclaimed - bUnclaimed;
     const aTime = a.stay?.intook_at ?? "";
     const bTime = b.stay?.intook_at ?? "";
     return bTime.localeCompare(aTime);
   });
+}
+
+function isUnclaimed(status: string | undefined): boolean {
+  return status === "available" || status === "intook";
 }
