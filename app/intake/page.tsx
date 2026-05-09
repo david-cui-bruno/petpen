@@ -101,7 +101,7 @@ export default function IntakePage() {
         </Section>
 
         {/* Collapsed by default: optional sections */}
-        <CollapsibleSection title="📅 Stay">
+        <CollapsibleSection title="📅 Stay" name="stay">
           <Field
             label="Expected return date"
             name="expected_return"
@@ -110,7 +110,7 @@ export default function IntakePage() {
           />
         </CollapsibleSection>
 
-        <CollapsibleSection title="💊 Medical">
+        <CollapsibleSection title="💊 Medical" name="medical">
           <CheckboxField label="Vaccinated" name="med_vaccinated" />
           <TextareaField
             label="Medications (name + dose + frequency)"
@@ -122,7 +122,7 @@ export default function IntakePage() {
           <TextareaField label="Special diet" name="med_diet" />
         </CollapsibleSection>
 
-        <CollapsibleSection title="🐕 Behavioral">
+        <CollapsibleSection title="🐕 Behavioral" name="behavioral">
           <CheckboxField label="House-trained" name="beh_house_trained" />
           <CheckboxField label="Crate-trained" name="beh_crate_trained" />
           <CheckboxField label="Good with dogs" name="beh_good_with_dogs" />
@@ -142,7 +142,7 @@ export default function IntakePage() {
           />
         </CollapsibleSection>
 
-        <CollapsibleSection title="📦 Logistics">
+        <CollapsibleSection title="📦 Logistics" name="logistics">
           <fieldset>
             <legend className="text-xl mb-1">Supplies provided:</legend>
             <div className="flex flex-wrap gap-3">

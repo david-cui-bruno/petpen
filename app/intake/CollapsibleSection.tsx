@@ -19,9 +19,14 @@ import { useState } from "react";
 // collapse" regression.)
 export function CollapsibleSection({
   title,
+  name,
   children,
 }: {
   title: string;
+  // Section identifier ("medical", "behavioral", etc.). Drives the hidden
+  // presence marker that lets the server action tell "user answered no" apart
+  // from "user never opened this section."
+  name: string;
   children: React.ReactNode;
 }) {
   const [open, setOpen] = useState(false);
@@ -48,6 +53,14 @@ export function CollapsibleSection({
         disabled={!everOpened}
         className="px-4 pb-4 space-y-3 border-0 p-0 m-0 min-w-0"
       >
+        {/* Presence marker — only submits if the fieldset is enabled, which
+            only happens once the user has opened the section. Server reads
+            this to distinguish "user said no" from "user skipped section." */}
+        <input
+          type="hidden"
+          name={`_section_${name}_submitted`}
+          value="1"
+        />
         {children}
       </fieldset>
     </details>
