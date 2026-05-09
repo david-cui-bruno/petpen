@@ -201,7 +201,14 @@ async function generateBuffer(breed) {
 }
 
 async function existingFiles() {
-  const { data } = await sb.storage.from("sprites").list("breeds", { limit: 200 });
+  const { data, error } = await sb.storage
+    .from("sprites")
+    .list("breeds", { limit: 200 });
+  if (error) {
+    throw new Error(
+      `Could not list sprites/breeds (storage error: ${error.message}). Refusing to start — fix storage access before re-running so we don't burn 50 Gemini calls.`
+    );
+  }
   return new Set((data ?? []).map((f) => f.name));
 }
 
@@ -267,6 +274,11 @@ async function main() {
     else failed++;
   }
   console.log(`\nDone. ${ok} new, ${skipped} skipped, ${failed} failed.`);
+  if (failed > 0) {
+    // Non-zero exit so CI/deploy scripts notice. Successful seeds remain
+    // uploaded; re-run the script to pick up the failed ones (idempotent).
+    process.exitCode = 1;
+  }
 }
 
 main().catch((err) => {
