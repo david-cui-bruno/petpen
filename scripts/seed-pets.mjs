@@ -124,7 +124,7 @@ async function makeTransparentBg(input) {
 
 async function generateSpriteBuffer(species, breed) {
   const subject = breed && breed !== "Mixed/Unknown" ? breed : species;
-  const prompt = `Create a cute low-res 8bit sprite side view of a ${subject}, no anti aliasing, square aspect ratio, transparent background, NES color palette`;
+  const prompt = `Create a cute low-res 8bit sprite side view of a ${subject}, no anti aliasing, square aspect ratio, solid lime green background, NES color palette`;
   for (let attempt = 1; attempt <= 2; attempt++) {
     try {
       const response = await ai.models.generateContent({
