@@ -175,24 +175,32 @@ function CareNotesPanel({ data }: { data: PetProfileData }) {
   const med = data.pet.medical ?? {};
   const items: { label: string; value: string }[] = [];
 
-  items.push({
-    label: "House-trained",
-    value: beh.house_trained ? "yes" : "no",
-  });
-  items.push({
-    label: "Crate-trained",
-    value: beh.crate_trained ? "yes" : "no",
-  });
+  // Only show booleans the owner actually answered. `undefined` means the
+  // optional section was skipped at intake — different from explicit "no".
+  if (beh.house_trained !== undefined) {
+    items.push({
+      label: "House-trained",
+      value: beh.house_trained ? "yes" : "no",
+    });
+  }
+  if (beh.crate_trained !== undefined) {
+    items.push({
+      label: "Crate-trained",
+      value: beh.crate_trained ? "yes" : "no",
+    });
+  }
   if (beh.energy) {
     items.push({
       label: "Energy",
       value: ENERGY_LABELS[beh.energy] ?? `${beh.energy}/5`,
     });
   }
-  items.push({
-    label: "Vaccinated",
-    value: med.vaccinated ? "yes" : "no",
-  });
+  if (med.vaccinated !== undefined) {
+    items.push({
+      label: "Vaccinated",
+      value: med.vaccinated ? "yes" : "no",
+    });
+  }
   if (med.allergies) items.push({ label: "Allergies", value: med.allergies });
   if (med.diet) items.push({ label: "Diet", value: med.diet });
   if (med.medications)
