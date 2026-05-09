@@ -63,11 +63,13 @@ const supabase = createClient(SUPABASE_URL, SERVICE_KEY, {
 const ai = GOOGLE_API_KEY ? new GoogleGenAI({ apiKey: GOOGLE_API_KEY }) : null;
 
 // ---- sprite background removal (mirror of lib/sprite.ts) ----
-// Sample perimeter colors -> any color making up >=1% of perimeter is BG.
-// Then flood-fill from corners zeroing alpha on those colors.
+// v3: sample perimeter -> 1% threshold -> distance-based match (tolerance 8)
+// during flood fill. Tolerance bridges compression-noise variants of the
+// dominant background tones.
 const PERIMETER_FREQ_THRESHOLD = 0.01;
+const TOLERANCE = 8;
 
-function collectBackgroundColors(buf, width, height) {
+function collectAnchors(buf, width, height) {
   const counts = new Map();
   const sample = (x, y) => {
     const i = (y * width + x) * 4;
@@ -84,11 +86,14 @@ function collectBackgroundColors(buf, width, height) {
   }
   const perimeterPixels = 2 * width + 2 * (height - 2);
   const minCount = Math.max(1, perimeterPixels * PERIMETER_FREQ_THRESHOLD);
-  const bg = new Set();
+  const anchors = [];
   for (const [key, count] of counts) {
-    if (count >= minCount) bg.add(key);
+    if (count >= minCount) {
+      const [r, g, b] = key.split(",").map(Number);
+      anchors.push({ r, g, b });
+    }
   }
-  return bg;
+  return anchors;
 }
 
 async function makeTransparentBg(input) {
@@ -98,13 +103,24 @@ async function makeTransparentBg(input) {
   if (channels !== 4) throw new Error(`Expected RGBA, got ${channels}-channel`);
   const buf = Buffer.from(data);
 
-  const bgColors = collectBackgroundColors(buf, width, height);
-  if (bgColors.size === 0) {
+  const anchors = collectAnchors(buf, width, height);
+  if (anchors.length === 0) {
     return sharp(buf, { raw: { width, height, channels: 4 } }).png().toBuffer();
   }
 
-  const isBg = (p) =>
-    bgColors.has(`${buf[p]},${buf[p + 1]},${buf[p + 2]}`);
+  const isBg = (p) => {
+    const r = buf[p], g = buf[p + 1], b = buf[p + 2];
+    for (const a of anchors) {
+      if (
+        Math.abs(r - a.r) <= TOLERANCE &&
+        Math.abs(g - a.g) <= TOLERANCE &&
+        Math.abs(b - a.b) <= TOLERANCE
+      ) {
+        return true;
+      }
+    }
+    return false;
+  };
 
   const visited = new Uint8Array(width * height);
   const stack = [

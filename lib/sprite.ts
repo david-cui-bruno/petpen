@@ -1,32 +1,36 @@
 // Post-process AI-generated sprites: remove the (fake) "transparent"
-// background Gemini paints in (typically a checkerboard + white border).
+// background Gemini paints in.
 //
-// Strategy: sample colors along the image perimeter — those ARE the
-// background, by definition, since the subject doesn't touch the edge.
-// Then flood-fill from the four corners, zeroing alpha on any pixel whose
-// exact RGB matches a perimeter color. The subject's dark outline stops
-// the flood so the sprite stays intact.
+// Strategy:
+//   1. Walk the image perimeter and count exact RGB occurrences.
+//   2. Treat any color making up >=1% of perimeter pixels as a "background
+//      anchor."
+//   3. Flood-fill from the four corners. A pixel counts as background if
+//      its RGB is within +/- TOLERANCE of any anchor (per channel). The
+//      tolerance bridges the compression-noise variants Gemini emits
+//      around its dominant background tones — without tolerance the flood
+//      stops at the first off-by-one neighbor.
 //
-// Self-adapting (no hardcoded thresholds) so it works for whatever
-// background Gemini decides to paint that day.
+// Tolerance of 8 catches near-white-and-light-gray clusters but stays well
+// clear of saturated subject colors. The dog's dark outline still bounds
+// the fill, so the subject body is never touched.
 
 import sharp from "sharp";
 
-const PERIMETER_FREQ_THRESHOLD = 0.01; // a color must be ≥1% of perimeter pixels to count as bg
+const PERIMETER_FREQ_THRESHOLD = 0.01;
+const TOLERANCE = 8;
 
-function rgbKey(r: number, g: number, b: number): string {
-  return `${r},${g},${b}`;
+interface Anchor {
+  r: number;
+  g: number;
+  b: number;
 }
 
-function collectBackgroundColors(
-  buf: Buffer,
-  width: number,
-  height: number
-): Set<string> {
+function collectAnchors(buf: Buffer, width: number, height: number): Anchor[] {
   const counts = new Map<string, number>();
   function sample(x: number, y: number) {
     const i = (y * width + x) * 4;
-    const key = rgbKey(buf[i], buf[i + 1], buf[i + 2]);
+    const key = `${buf[i]},${buf[i + 1]},${buf[i + 2]}`;
     counts.set(key, (counts.get(key) ?? 0) + 1);
   }
   for (let x = 0; x < width; x++) {
@@ -39,11 +43,14 @@ function collectBackgroundColors(
   }
   const perimeterPixels = 2 * width + 2 * (height - 2);
   const minCount = Math.max(1, perimeterPixels * PERIMETER_FREQ_THRESHOLD);
-  const bg = new Set<string>();
+  const anchors: Anchor[] = [];
   for (const [key, count] of counts) {
-    if (count >= minCount) bg.add(key);
+    if (count >= minCount) {
+      const [r, g, b] = key.split(",").map(Number);
+      anchors.push({ r, g, b });
+    }
   }
-  return bg;
+  return anchors;
 }
 
 export async function makeTransparentBg(input: Buffer): Promise<Buffer> {
@@ -55,14 +62,25 @@ export async function makeTransparentBg(input: Buffer): Promise<Buffer> {
   }
   const buf = Buffer.from(data);
 
-  const bgColors = collectBackgroundColors(buf, width, height);
-  if (bgColors.size === 0) {
-    // Couldn't identify a background; return as-is rather than mangle the sprite.
+  const anchors = collectAnchors(buf, width, height);
+  if (anchors.length === 0) {
     return sharp(buf, { raw: { width, height, channels: 4 } }).png().toBuffer();
   }
 
   function isBg(pIdx: number): boolean {
-    return bgColors.has(rgbKey(buf[pIdx], buf[pIdx + 1], buf[pIdx + 2]));
+    const r = buf[pIdx];
+    const g = buf[pIdx + 1];
+    const b = buf[pIdx + 2];
+    for (const a of anchors) {
+      if (
+        Math.abs(r - a.r) <= TOLERANCE &&
+        Math.abs(g - a.g) <= TOLERANCE &&
+        Math.abs(b - a.b) <= TOLERANCE
+      ) {
+        return true;
+      }
+    }
+    return false;
   }
 
   const visited = new Uint8Array(width * height);
